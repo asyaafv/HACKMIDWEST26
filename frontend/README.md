@@ -50,3 +50,13 @@ When hosting the production build, configure SPA fallback to `index.html` for th
 Merchant logo files are awaiting user delivery: GitHub, Delta, GiftCards.com, Google Ads, AWS, Deel, Notion, Stripe, FedEx, Linear. No merchant artwork is drawn, substituted, or downloaded. Their layout space remains reserved without displaying replacement graphics. Once provided, store the files under `public/assets/merchants/` and set each merchant's `logo` path in `src/data.ts`.
 
 The supplied screenshot remains the visual authority. The exact merchant artwork is the remaining dependency for completing those placements. Self-hosted Inter and Phosphor pictograms approximate the reference's type and interface glyphs.
+
+## Character animation
+
+Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. Motion style (float, drift, gentle turn, or breathe), duration and phase are deterministically randomized from the agent ID and stay consistent across routes/reloads. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.
+
+Open `/animation-preview` (or “Try the animated character” on Gatekeepers) and choose any of the ten characters. The preview provides look left/right, blink, wink, eyes closed, pointer-following gaze, and pause/resume at 440px and 112px. Transactions and Overview show 52px animated agent portraits, up from 36px. Gatekeeper cards retain their larger portraits.
+
+Original PNGs remain intact. Generated clean plates repair only the feathered eye regions; provenance and exact prompts are stored beside each plate. Motion pauses offscreen, in hidden tabs and for paused Gatekeepers. Reduced motion allows direct expressions with no ambient spatial motion. Suspension preserves the timeline and current pose.
+
+Validation: `npm run build`, `npm run test`, and `npm run test:browser -- tests/browser/animation.spec.ts`.

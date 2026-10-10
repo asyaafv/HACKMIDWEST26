@@ -31,5 +31,11 @@
       "Linear"
     ],
     "policy": "No substitute graphics or visible placeholders. Render supplied asset only when its path exists in the merchant data."
+  },
+  "animationPrototype": {
+    "file": "public/assets/characters/character_01-clean-plate.png",
+    "origin": "Built-in imagegen edit of supplied character_01.png; prompt in adjacent .origin.json",
+    "treatment": "Feathered eye-region reconstruction only. Original body, beanie and background from supplied PNG.",
+    "scope": "User-authorized one-character prototype"
   }
 }
