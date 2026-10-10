@@ -21,7 +21,7 @@ Seven pages: Overview, Needs a decision, Transactions/Requests, Gatekeepers, Pol
 Name: Gate. Supplied rainbow logo only in the top-left brand. User-supplied dark dashboard is visual authority. Agents navigation/page renamed Gatekeepers. Supplied original ten character images used as circular crops; images may be reused. Original artwork stays intact; user-authorized clean plates repair eye regions for character animation. Unapproved visual changes require the user's decision.
 
 ## Evidence on Hand
-Reference screenshot and original logo PNG supplied in chat; ten original character PNGs supplied in a ZIP. Merchant logos are pending user delivery; substitutions and visible placeholders are not authorized. Demo records are synthetic, with 24 initial records and consistent dates.
+Reference screenshot and original logo PNG supplied in chat; ten original character PNGs supplied in a ZIP. User-authorized merchant logos are fetched from official company websites and stored locally with source provenance; generated substitutes are not authorized. Demo records are synthetic, with 24 initial records and consistent dates.
 
 ## Product Principles
 - Preserve the approved screenshot and artwork.

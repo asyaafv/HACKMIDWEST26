@@ -8,7 +8,7 @@ export function Avatar({ agent, size = 52 }: { agent: Gatekeeper; size?: number 
   return <AnimatedAvatar key={`${agent.id}-${agent.avatar}`} character={agent.avatar} identity={agent.id} size={size} label={`${agent.name} character portrait`} paused={!agent.active} />;
 }
 export function MerchantImage({ merchant, size = 36 }: { merchant: Merchant; size?: number }) {
-  return merchant.logo ? <img className="merchant-image" src={merchant.logo} alt="" width={size} height={size} /> : <span className="merchant-space" style={{ width: size, height: size }} aria-hidden="true" />;
+  return merchant.logo ? <img className={`merchant-image merchant-image-${merchant.id}`} src={merchant.logo} alt="" width={size} height={size} /> : <span className="merchant-space" style={{ width: size, height: size }} aria-hidden="true" />;
 }
 export function Status({ value, large = false }: { value: Decision; large?: boolean }) {
   return <span className={`status ${value.toLowerCase()} ${large ? 'status-large' : ''}`}>{large && value === 'Approved' && <CheckCircle size={22} weight="fill" />}{large && value === 'Blocked' && <WarningCircle size={22} />}{large ? value.toUpperCase() : value}</span>;

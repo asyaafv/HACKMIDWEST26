@@ -256,7 +256,7 @@ Selected rows lift to `selected-row`. The detail panel repeats the merchant, amo
 
 ### Artwork
 
-Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (52px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos remain pending supplied files: reserve invisible image dimensions when unavailable. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
+Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (52px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos use original files fetched from official company websites, with source URLs and hashes recorded in ASSETS.json and adjacent origin files; never reconstruct or recolor them. GitHub uses a white backing with 3px padding to preserve legibility on the dark surface. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
 
 ## Do's and Don'ts
 

@@ -43,7 +43,7 @@ export class AvatarDirector {
     const prior = this.history.get(entry.identity);
     const choices: AmbientAction[] = [...motionStyles, 'glance', 'blink', 'wink'];
     const options = choices.filter(a => a !== prior?.action);
-    const action = prior ? options[Math.floor(this.random() * options.length)] : avatarProfile(entry.identity).style;
+    const action = prior ? options[Math.floor(this.random() * options.length)] : choices[avatarProfile(entry.identity).seed % choices.length];
     this.history.set(entry.identity, { action, last: now, next: now });
     this.active = { key, until: now + durations[action] };
     entry.start(action, durations[action]);

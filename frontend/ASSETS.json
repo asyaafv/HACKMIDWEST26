@@ -17,20 +17,80 @@
     ]
   },
   "merchantLogos": {
-    "status": "awaiting-user-assets",
-    "names": [
-      "GitHub",
-      "Delta",
-      "GiftCards.com",
-      "Google Ads",
-      "AWS",
-      "Deel",
-      "Notion",
-      "Stripe",
-      "FedEx",
-      "Linear"
-    ],
-    "policy": "No substitute graphics or visible placeholders. Render supplied asset only when its path exists in the merchant data."
+    "status": "downloaded-official-assets",
+    "policy": "Original logo and brand icon bytes downloaded from company-owned websites and their asset CDNs. No generated or reconstructed artwork.",
+    "assets": [
+      {
+        "file": "public/assets/merchants/aws.png",
+        "sourceUrl": "https://a0.awsstatic.com/libra-css/images/logos/aws_smile-header-desktop-en-white_59x35.png",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "266b065450faf27fb913a1fd7c4648eba7e72ae4e33e8f27005b097096469fd9"
+      },
+      {
+        "file": "public/assets/merchants/deel.png",
+        "sourceUrl": "https://www.deel.com/apple-icon.png?d2b410d8d6714d15",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "c9f0ee85d9a5d3c0de2f14b2ee3ff668013c82b5b137d8272a48adf9971f8545"
+      },
+      {
+        "file": "public/assets/merchants/delta.png",
+        "sourceUrl": "https://news.delta.com/themes/custom/newshubten/build/assets/icons/icon_192.png",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "af785576d7e38b663efa6c5f1f0b9bcab6527812ae4c1f79d4c7408c20845465"
+      },
+      {
+        "file": "public/assets/merchants/fedex.png",
+        "sourceUrl": "https://www.fedex.com/content/dam/fedex-com/logos/logo.png",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "99f7cd905d160e4bf4408195b22a893a45661a8855a0841e207d5bafe7411d90"
+      },
+      {
+        "file": "public/assets/merchants/giftcards.svg",
+        "sourceUrl": "https://www.giftcards.com/content/dam/seo/favicon.svg",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "e44784c65cee8b29eb3832357026b0a3c244dadde1d77ea106c13f9450387430"
+      },
+      {
+        "file": "public/assets/merchants/github.svg",
+        "sourceUrl": "https://github.githubassets.com/favicons/favicon.svg",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "6a9577cd4f7fa6b75bde1025af85b944e9dd1388373b55ccba6e9f80ac2eae60"
+      },
+      {
+        "file": "public/assets/merchants/google.svg",
+        "sourceUrl": "https://www.gstatic.com/images/branding/productlogos/ads/v5/192px.svg",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "69b023ff2ac2e7e72777701822b842f66128a41cd2035188c89ce45e940eb7bc"
+      },
+      {
+        "file": "public/assets/merchants/linear.svg",
+        "sourceUrl": "https://linear.app/static/favicon.svg?v=2",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "6d49f8079f8cf91617657bd059ba1e186f2d3ecdcd9a4a366e0a6d5071c558e6"
+      },
+      {
+        "file": "public/assets/merchants/notion.png",
+        "sourceUrl": "https://www.notion.com/front-static/logo-ios.png",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "483846a85e43e22879445047b83b22033e70fcc25ab34809ebadb7f856507ee0"
+      },
+      {
+        "file": "public/assets/merchants/stripe.svg",
+        "sourceUrl": "https://images.stripeassets.com/fzn2n1nzq965/1hgcBNd12BfT9VLgbId7By/01d91920114b124fb4cf6d448f9f06eb/favicon.svg",
+        "retrievedAt": "2026-10-10",
+        "treatment": "Original downloaded bytes; no reconstruction or recoloring",
+        "sha256": "7253e3eb4657773723a696a1f4ad9c8f62794191b9f09c1359db74a51d2d3ae5"
+      }
+    ]
   },
   "animationPrototype": {
     "files": "public/assets/characters/character_01-clean-plate.png through character_10-clean-plate.png",

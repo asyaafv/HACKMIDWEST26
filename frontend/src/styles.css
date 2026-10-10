@@ -124,6 +124,7 @@ select option { background: #17222d; color: var(--text); }
 .entity span:not(.merchant-space):not(.animated-avatar) { display: block; font-size: 14px; color: var(--secondary); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .avatar { display: block; flex-shrink: 0; object-fit: cover; border-radius: 50%; background: #090e13; }
 .merchant-image { display: block; object-fit: contain; border-radius: 8px; flex-shrink: 0; }
+.merchant-image-github { background: #fff; padding: 3px; }
 .merchant-space { display: block; flex-shrink: 0; }
 .amount-cell { text-align: right !important; font-variant-numeric: tabular-nums; }
 .amount-cell strong { display: block; font-size: 16px; font-weight: 700; }

@@ -86,12 +86,12 @@ export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = fals
         root.current!.dataset.action = action;
         if (action === 'glance' || action === 'blink' || action === 'wink') state.playAmbient(action);
         else {
-          const distance = Math.min(3, size * .012), drift = Math.min(1, size * .007);
+          const distance = Math.min(4, size * .03), drift = Math.min(3, size * .024);
           const neutral = 'scale(.975)';
           const poses = action === 'float' ? [neutral, `translateY(${-distance}px) scale(.975)`, `translateY(${distance}px) scale(.975)`, neutral]
             : action === 'drift' ? [neutral, `translate(${drift}px, ${-drift}px) scale(.975)`, `translate(${-drift}px, ${drift}px) scale(.975)`, neutral]
-            : action === 'turn' ? [neutral, 'rotate(-1.2deg) scale(.975)', 'rotate(1.2deg) scale(.975)', neutral]
-            : [neutral, 'scale(.985)', neutral];
+            : action === 'turn' ? [neutral, 'rotate(-3deg) scale(.975)', 'rotate(3deg) scale(.975)', neutral]
+            : [neutral, 'scale(.995)', neutral];
           bodyAnimation.current = node.animate(poses.map(transform => ({ transform, easing: 'ease-in-out' })), { duration, easing: 'linear', iterations: 1 });
         }
       },

@@ -2,6 +2,18 @@ import { test, expect } from '@playwright/test';
 
 test.use({ reducedMotion: 'no-preference' });
 
+test('ambient turns change the rendered portrait, not only its activity flag', async ({ page }) => {
+  await page.goto('/gatekeepers');
+  await expect.poll(() => page.locator('.animated-avatar').evaluateAll(avatars => avatars.some(avatar => {
+    const svg = avatar.querySelector('svg')!;
+    const matrix = new DOMMatrix(getComputedStyle(svg).transform);
+    const bodyMoved = Math.hypot(matrix.e, matrix.f) > .5 || Math.abs(matrix.b) > .005 || matrix.a > .98;
+    const eyesMoved = [...avatar.querySelectorAll('.rig-outline')].some(eye => Number(eye.getAttribute('data-openness')) < .9)
+      || [...avatar.querySelectorAll('.rig-pupil')].some(pupil => Math.abs(Number(pupil.getAttribute('transform')?.match(/translate\(([-\d.]+)/)?.[1])) > 10);
+    return bodyMoved || eyesMoved;
+  })), { timeout: 12000, intervals: [50] }).toBe(true);
+});
+
 test('expressions can interrupt each other and replay; pause stops ambient motion', async ({ page }) => {
   await page.goto('/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');

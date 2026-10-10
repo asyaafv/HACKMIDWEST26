@@ -4,16 +4,17 @@ import { AvatarDirector, type AmbientAction } from '../../src/avatar-director';
 describe('quiet ambient animation director', () => {
   it('leases one portrait at a time with a quiet interval between turns', () => {
     const director = new AvatarDirector(() => 0);
-    let active = 0, starts = 0;
+    let active = 0, starts = 0, duration = 0;
     for (const identity of ['agent-a', 'agent-b']) director.register(identity, {
-      identity, enabled: true, start: () => { active++; starts++; expect(active).toBe(1); }, finish: () => { active--; },
+      identity, enabled: true, start: (_, ms) => { duration = ms; active++; starts++; expect(active).toBe(1); }, finish: () => { active--; },
     });
     director.tick(0); director.tick(2999); expect(starts).toBe(0);
     director.tick(3000); expect(starts).toBe(1);
-    director.tick(5000); expect(starts).toBe(1);
-    director.tick(9000); expect(active).toBe(0);
-    director.tick(11999); expect(starts).toBe(1);
-    director.tick(12000); expect(starts).toBe(2); expect(active).toBe(1);
+    const ends = 3000 + duration;
+    director.tick(ends - 1); expect(active).toBe(1);
+    director.tick(ends); expect(active).toBe(0);
+    director.tick(ends + 2999); expect(starts).toBe(1);
+    director.tick(ends + 3000); expect(starts).toBe(2); expect(active).toBe(1);
   });
   it('rotates actions and enforces per-agent rest even with duplicate rows', () => {
     const director = new AvatarDirector(() => 0);
