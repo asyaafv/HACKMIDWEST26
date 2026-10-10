@@ -1,0 +1,7 @@
+{
+  "source": "character_01.png",
+  "tool": "built-in image_gen.imagegen",
+  "authorization": "User requested an animation prototype of one existing character on 2026-10-10.",
+  "treatment": "Non-destructive clean plate, used only through feathered eye-region masks; original PNG remains intact. SVG eyes animate independently.",
+  "prompt": "Edit target: supplied square red spherical character with red beanie, dark background and purple ground glow. Create an animation clean plate: remove BOTH entire eyes including white rings, black pupils, white highlights. Fill those regions with continuous red skin matching the existing sphere lighting and texture. Keep EXACT original composition, body silhouette, hat, dark background, shadow and all other pixels as closely as possible. Do not add a face, mouth, marks, eyes, eyebrows or features. Same square framing and character placement as reference. The result must be the identical character with a completely blank red face. This is a clean plate for compositing the original eyes separately, not a redesign."
+}

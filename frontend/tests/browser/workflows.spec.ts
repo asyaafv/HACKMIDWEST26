@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 
 test('queue selection, filters, sections, search, and copy', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/');
+  await page.goto('/transactions');
   await expect(page.getByRole('heading', { name: 'Authorization queue' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'All 24', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approved 18', exact: true })).toBeVisible();
@@ -35,7 +35,7 @@ test('Gatekeeper dialog, original avatar selection, persistence, and pause', asy
   await expect(page.getByRole('heading', { name: 'Research-11' })).toBeVisible();
   await page.reload();
   const card = page.locator('.gatekeeper-card').filter({ has: page.getByRole('heading', { name: 'Research-11' }) });
-  await expect(card.locator('img')).toHaveAttribute('src', '/assets/characters/character_05.png');
+  await expect(card.locator('svg image').first()).toHaveAttribute('href', '/assets/characters/character_05.png');
   await card.getByRole('button', { name: 'Edit Research-11' }).click();
   await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Evaluates new developer tools.');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
@@ -95,7 +95,7 @@ test('corrupt storage is retained until explicit recovery', async ({ page }) => 
   await expect.poll(() => page.evaluate(() => localStorage.getItem('gate.demo.v1'))).toBe('{corrupt');
   await page.getByRole('button', { name: 'Reset demo', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Reset demo', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Authorization queue' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Workspace overview' })).toBeVisible();
 });
 
 test('open transaction panel follows responsive focus and scroll behavior', async ({ page }) => {
@@ -137,7 +137,9 @@ test('batched visual review and responsive checks', async ({ page }) => {
     if (width < 1536) { await page.keyboard.press('Escape'); await expect(page.locator('.detail-panel')).toHaveCount(0); }
     await page.goto('/gatekeepers');
     await expect(page.getByRole('heading', { name: 'Gatekeepers', exact: true })).toBeVisible();
-    await page.locator('.gatekeeper-card img').first().evaluate((image: HTMLImageElement) => image.decode());
+    await page.locator('.gatekeeper-card svg image').first().evaluate(async image => {
+      const original = new Image(); original.src = image.getAttribute('href')!; await original.decode();
+    });
     expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `.impeccable/review/gatekeepers-${width}.png`, fullPage: false });
     if (width === 390) {

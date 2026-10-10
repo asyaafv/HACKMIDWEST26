@@ -57,3 +57,17 @@ Open `/live` for the real backend workflow; the designed demo remains separate.
 Run `./run-gate.sh` from the repository root for coordinated API/frontend ports.
 The local API proxy uses `GATE_API_URL` (default http://127.0.0.1:8000).
 See [integration flow](../backend/docs/integration-flow.md) for independent operator/finance testing and production HTTPS requirements.
+
+## Character animation
+
+Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. An initial motion style (float, drift, gentle turn, or breathe) is assigned from the agent ID; subsequent turns rotate actions through the shared scheduler. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.
+
+Open `/animation-preview` (or “Try the animated character” on Gatekeepers) and choose any of the ten characters. The preview provides look left/right, blink, wink, eyes closed, pointer-following gaze, and pause/resume at 440px and 112px. Transactions and Overview show 72px animated agent portraits. Gatekeeper cards use 160px portraits on desktop and 128px on mobile.
+
+Original PNGs remain intact. Generated clean plates repair only the feathered eye regions; provenance and exact prompts are stored beside each plate. Motion pauses offscreen, in hidden tabs and for paused Gatekeepers. Reduced motion allows direct expressions with no ambient spatial motion. Suspension preserves the timeline and current pose.
+
+Validation: `npm run build`, `npm run test`, and `npm run test:browser -- tests/browser/animation.spec.ts`.
+
+Ambient animation runs independently for each visible agent, with staggered first turns within one second and 3–4 seconds of rest between actions. Duplicate rows share an identity cooldown. Actions rotate through float, drift, tilt, breathe, nod, lean, glance, blink, wink and a relaxed both-eyes-closed pose. The relaxed pose closes over 140 ms, holds for one second, and reopens over 260 ms. Offscreen, paused and reduced-motion portraits stay still; preview controls remain available.
+
+Gaze now moves each white eye ring, its eyelid aperture and its pupil together, with up to 75 source-image units of horizontal travel including the delayed sway. The glasses character retains fixed frames and moves its pupils inside them.

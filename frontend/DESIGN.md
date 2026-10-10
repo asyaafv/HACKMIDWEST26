@@ -256,7 +256,7 @@ Selected rows lift to `selected-row`. The detail panel repeats the merchant, amo
 
 ### Artwork
 
-Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (36px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos remain pending supplied files: reserve invisible image dimensions when unavailable. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
+Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (52px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos use original files fetched from official company websites, with source URLs and hashes recorded in ASSETS.json and adjacent origin files; never reconstruct or recolor them. GitHub uses a white backing with 3px padding to preserve legibility on the dark surface. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
 
 ## Do's and Don'ts
 
@@ -275,3 +275,17 @@ Reuse the ten supplied originals as circular portraits; never regenerate or redr
 - **Don't** fill missing merchant imagery with substitute graphics, monograms, or visible placeholder boxes.
 - **Don't** squeeze the transaction table into illegible columns on mobile; retain horizontal scrolling.
 - **Don't** add redundant decorative eyebrows to form or section headings.
+
+## Authorized character animation
+
+All ten supplied originals remain intact. User-approved generated clean plates reconstruct only feathered eye regions for independent curved eyelids and pupil movement. Character 07 retains its eyeglass frames and bridge. Agents receive stable randomized drift, turn, breathe and eye actions with staggered timing; spatial movement scales down with portrait size. Selected transaction portraits add a stronger float independently of their ambient actions. Transactions and Overview use 52px portraits. Gatekeeper portraits remain 112px (94px on mobile). Motion stops offscreen, when the document is hidden, when an agent is paused, and under reduced motion. `/animation-preview` lets the user inspect each character.
+
+## Decision-first workspace
+
+Overview is the home screen. Its first section is a full-width decision summary with the pending count, total amount, neutral primary Review next request action, and up to three preview rows. Metrics and historical activity follow. Pending attention uses an amber-tinted surface (`#211e14`), border (`#64512a`), separators (`#4a4029`), and warm supporting text (`#dfd3b8`); these are semantic review colors, not brand accents. The summary heading is 25px (22px on mobile). At zero pending requests, a compact neutral caught-up state replaces the attention section.
+
+Needs a decision sits beneath Overview in navigation, using a compact 14px label to accommodate its count within the existing sidebar. Its amber badge uses the existing pending surface and amber text, and disappears at zero. `/decisions` reuses the transaction workspace, all pending records without a date cutoff, and priority/oldest-first ordering. Saved decisions advance to the next item and announce completion independently of toast preferences. Preview rows stack their identity, priority, waiting duration, amount, and explicit Review action on mobile. Attention cues remain static.
+
+### Quiet animation turns
+
+Ambient animation runs independently for each visible agent, with staggered first turns within one second and 3–4 seconds of rest between actions. Duplicate rows share an identity cooldown. Actions rotate through drift, tilt, breathe, nod, lean, look around, look left, look right, blink, wink and a relaxed both-eyes-closed pose. Floating is reserved for selected transaction portraits and the explicit Float toggle in the preview; it uses a separate 3.6-second sine-like bob with 4–18px travel per direction, scaled to portrait size. Eye and other ambient actions continue independently while floating. Deselection removes the bob immediately; pause, offscreen, hidden-tab and reduced-motion states stop it. The relaxed pose closes over 140 ms, holds for one second, and reopens over 260 ms. Offscreen, paused and reduced-motion portraits stay still; preview controls remain available.

@@ -1,18 +1,18 @@
 import type { DemoState, Merchant, Policy, PolicyCheck, RequestInput, Transaction } from './types';
 
-// Merchant artwork is intentionally absent until the user supplies originals.
-// Add a local /assets/merchants/... path to `logo` once those files arrive.
+// Original merchant artwork downloaded from official sites.
+// Source URLs and hashes are recorded beside each asset and in ASSETS.json.
 export const merchants: Merchant[] = [
-  { id: 'github', name: 'GitHub', category: 'Software', domain: 'github.com' },
-  { id: 'delta', name: 'Delta', category: 'Travel', domain: 'delta.com' },
-  { id: 'giftcards', name: 'GiftCards.com', category: 'Retail', domain: 'giftcards.com' },
-  { id: 'google', name: 'Google Ads', category: 'Advertising', domain: 'ads.google.com' },
-  { id: 'aws', name: 'AWS', category: 'Cloud Services', domain: 'aws.amazon.com' },
-  { id: 'deel', name: 'Deel', category: 'HR / Recruiting', domain: 'deel.com' },
-  { id: 'notion', name: 'Notion', category: 'Software', domain: 'notion.so' },
-  { id: 'stripe', name: 'Stripe', category: 'Payments', domain: 'stripe.com' },
-  { id: 'fedex', name: 'FedEx', category: 'Shipping', domain: 'fedex.com' },
-  { id: 'linear', name: 'Linear', category: 'Software', domain: 'linear.app' },
+  { id: 'github', logo: '/assets/merchants/github.svg', name: 'GitHub', category: 'Software', domain: 'github.com' },
+  { id: 'delta', logo: '/assets/merchants/delta.png', name: 'Delta', category: 'Travel', domain: 'delta.com' },
+  { id: 'giftcards', logo: '/assets/merchants/giftcards.svg', name: 'GiftCards.com', category: 'Retail', domain: 'giftcards.com' },
+  { id: 'google', logo: '/assets/merchants/google.svg', name: 'Google Ads', category: 'Advertising', domain: 'ads.google.com' },
+  { id: 'aws', logo: '/assets/merchants/aws.png', name: 'AWS', category: 'Cloud Services', domain: 'aws.amazon.com' },
+  { id: 'deel', logo: '/assets/merchants/deel.png', name: 'Deel', category: 'HR / Recruiting', domain: 'deel.com' },
+  { id: 'notion', logo: '/assets/merchants/notion.png', name: 'Notion', category: 'Software', domain: 'notion.so' },
+  { id: 'stripe', logo: '/assets/merchants/stripe.svg', name: 'Stripe', category: 'Payments', domain: 'stripe.com' },
+  { id: 'fedex', logo: '/assets/merchants/fedex.png', name: 'FedEx', category: 'Shipping', domain: 'fedex.com' },
+  { id: 'linear', logo: '/assets/merchants/linear.svg', name: 'Linear', category: 'Software', domain: 'linear.app' },
 ];
 export const departments = ['procurement', 'travel', 'marketing', 'infrastructure', 'hr', 'finance', 'operations', 'engineering'];
 export const avatarUrl = (number: number) => `/assets/characters/character_${String(number).padStart(2, '0')}.png`;
