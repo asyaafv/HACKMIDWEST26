@@ -51,6 +51,13 @@ Merchant logo files are awaiting user delivery: GitHub, Delta, GiftCards.com, Go
 
 The supplied screenshot remains the visual authority. The exact merchant artwork is the remaining dependency for completing those placements. Self-hosted Inter and Phosphor pictograms approximate the reference's type and interface glyphs.
 
+## Connected workspace
+
+Open `/live` for the real backend workflow; the designed demo remains separate.
+Run `./run-gate.sh` from the repository root for coordinated API/frontend ports.
+The local API proxy uses `GATE_API_URL` (default http://127.0.0.1:8000).
+See [integration flow](../backend/docs/integration-flow.md) for independent operator/finance testing and production HTTPS requirements.
+
 ## Character animation
 
 Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. An initial motion style (float, drift, gentle turn, or breathe) is assigned from the agent ID; subsequent turns rotate actions through the shared scheduler. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.

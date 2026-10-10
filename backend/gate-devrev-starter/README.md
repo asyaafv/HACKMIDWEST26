@@ -1,3 +1,10 @@
+# Historical starter — use the TypeScript Gate backend
+
+This folder predates the shared GateService integration. Do not start its Python
+server alongside Gate or install its old three-tool contract in DevRev. Use the
+canonical backend `/mcp` endpoint and [current integration flow](../docs/integration-flow.md).
+The material below is historical reference, not the active setup guide.
+
 # Gate + DevRev Computer — Phase 1
 
 This is a **real starter implementation** for the **read-only MCP server**
