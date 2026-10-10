@@ -1,0 +1,35 @@
+{
+  "logo": {
+    "file": "public/assets/gate-logo.png",
+    "origin": "User-supplied original PNG, codex-clipboard-4a4d35f3-a98e-4148-8bca-e4be93acaa8f.png",
+    "treatment": "Original bytes, CSS circle crop; top-left only"
+  },
+  "characters": {
+    "files": "public/assets/characters/character_01.png through character_10.png",
+    "origin": "User-supplied customizable_character_10_variations (1).zip",
+    "treatment": "Original bytes, CSS circle crop"
+  },
+  "reference": {
+    "origin": "User-supplied codex-clipboard-780b85a0-115c-4646-bbb5-77996d20d3ad.png",
+    "viewport": [
+      1672,
+      941
+    ]
+  },
+  "merchantLogos": {
+    "status": "awaiting-user-assets",
+    "names": [
+      "GitHub",
+      "Delta",
+      "GiftCards.com",
+      "Google Ads",
+      "AWS",
+      "Deel",
+      "Notion",
+      "Stripe",
+      "FedEx",
+      "Linear"
+    ],
+    "policy": "No substitute graphics or visible placeholders. Render supplied asset only when its path exists in the merchant data."
+  }
+}
