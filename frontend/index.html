@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HACKMIDWEST26</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+    main {
+      width: min(32rem, 100% - 2rem);
+    }
+    button {
+      font: inherit;
+      padding: 0.5rem 0.9rem;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>HACKMIDWEST26</h1>
+    <p>Frontend talking to the local backend.</p>
+    <button id="ping" type="button">Check backend</button>
+    <p id="status">Not checked yet.</p>
+  </main>
+  <script>
+    const status = document.getElementById("status");
+    document.getElementById("ping").addEventListener("click", async () => {
+      status.textContent = "Checking…";
+      try {
+        const response = await fetch("http://127.0.0.1:8000/health");
+        const data = await response.json();
+        status.textContent = data.ok
+          ? `Backend is up: ${data.service}`
+          : "Backend responded, but not ready.";
+      } catch (error) {
+        status.textContent = "Backend is not reachable. Start backend/server.py.";
+      }
+    });
+  </script>
+</body>
+</html>
