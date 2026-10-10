@@ -1,6 +1,7 @@
 node_modules/
 dist/
-work/
+work/*
+!work/postgres/
 .env
 .env.*
 !.env.example
