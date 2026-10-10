@@ -1,8 +1,8 @@
-# AgentPay Agent Studio Guardrails
+# Gatekeeper Agent Studio Guardrails
 
 Suggested goal:
 "Investigate purchase requests using authorized Maple Payments records,
-then call read-only AgentPay tools to explain simulated policy decisions."
+then call read-only Gate MCP Server tools to explain simulated policy decisions."
 
 Suggested guardrail description:
 "Never authorize, execute, or promise a financial transaction. Do not treat
@@ -20,7 +20,7 @@ Recommended Knowledge (only if available in the challenge playground):
 - Opportunity only if relevant
 
 Testing prompts:
-1. "Run agentpay_health."
+1. "Run gate_health."
 2. "Find and cite a real Maple Payments issue linked to a support ticket."
 3. "Review a simulated $1,800 monitoring purchase related to that issue."
 4. "Try a simulated $3,500 purchase with a $2,000 spending limit."

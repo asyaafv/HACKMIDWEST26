@@ -1,14 +1,14 @@
-# AgentPay + DevRev Computer — Phase 1
+# Gate + DevRev Computer — Phase 1
 
 This is a **real starter implementation** for the **read-only MCP server**
 and a **copy/paste skill playbook**, NOT a completed DevRev integration.
 
 ## What it includes
 
-- `server.py`: AgentPay MCP server with three tools:
-  `agentpay_health`, `agentpay_evidence_checklist`, `agentpay_policy_preview`.
+- `server.py`: Gate MCP Server with three tools:
+  `gate_health`, `gate_evidence_checklist`, `gate_policy_preview`.
 - `policy.py`: deterministic, unit-tested financial *preview* logic.
-- `devrev/AGENTPAY_SKILL.md`: instructions to use in a DevRev Computer skill/agent.
+- `devrev/GATEKEEPER_REVIEW_SKILL.md`: Gatekeeper Review instructions for the Gatekeeper AI agent in DevRev Computer.
 - `devrev/GUARDRAILS.md`: suggested goal, safety controls, and test prompts.
 - `tests/test_policy.py`: standard-library tests without internet.
 
@@ -17,7 +17,7 @@ No DevRev secrets or tokens are shipped. No real money can move.
 ## Local setup (Windows PowerShell)
 
 ```powershell
-cd agentpay-devrev-starter
+cd gate-devrev-starter
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
@@ -31,7 +31,7 @@ The MCP server listens at `http://127.0.0.1:8000/mcp`.
 ## Local setup (Mac/Linux)
 
 ```bash
-cd agentpay-devrev-starter
+cd gate-devrev-starter
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
@@ -47,7 +47,7 @@ npx @modelcontextprotocol/inspector
 ```
 
 Set Transport = Streamable HTTP and URL = `http://127.0.0.1:8000/mcp`,
-connect, list tools, and call `agentpay_health`.
+connect, list tools, and call `gate_health`.
 
 **Do not open `/mcp` in a browser and expect a normal web page.** MCP is
 JSON-RPC over Streamable HTTP, not a conventional GET endpoint.
@@ -59,15 +59,15 @@ an agent. Exact menu and authentication fields may differ by playground.
 
 1. Confirm you are in your team-assigned DevRev challenge organization.
 2. Open Computer / Agent Studio, typically Settings -> Agent Studio, and
-   identify or create the relevant internal agent, if allowed.
+   identify or create the Gatekeeper AI agent, if allowed.
 3. Get our MCP server to a publicly reachable HTTPS URL protected by
    authentication **compatible with DevRev's external MCP registration**.
    Do not expose this dev server directly to the internet.
 4. Add a custom MCP server using that external URL ending in `/mcp`.
 5. Install/attach it to the intended Computer agent; verify that
-   `agentpay_health` appears and returns `phase: 1-read-only`.
+   `gate_health` appears and returns `phase: 1-read-only`.
 6. Add a reusable workflow/skill as supported by the playground. Paste and
-   adapt `devrev/AGENTPAY_SKILL.md` into the skill instructions or agent
+   adapt `devrev/GATEKEEPER_REVIEW_SKILL.md` into the skill instructions or agent
    instructions. Native DevRev search/read actions must also be enabled.
 7. In DevRev Computer, find real benchmark issue/ticket IDs and test a policy
    preview with those IDs; note the server does not independently fetch them.
