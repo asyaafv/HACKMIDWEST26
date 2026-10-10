@@ -1,0 +1,131 @@
+{
+  "records": [
+    {
+      "id": "GATE-ISSUE-101",
+      "kind": "issue",
+      "title": "Northstar export queue delays",
+      "status": "open",
+      "observedAt": "2026-10-08T14:00:00Z",
+      "ticketId": "GATE-TICKET-101",
+      "component": "export-queue"
+    },
+    {
+      "id": "GATE-TICKET-101",
+      "kind": "ticket",
+      "title": "Delayed scheduled exports",
+      "accountId": "GATE-ACCOUNT-101",
+      "openedAt": "2026-10-08T12:00:00Z",
+      "impact": "Scheduled reports arrive late"
+    },
+    {
+      "id": "GATE-ACCOUNT-101",
+      "kind": "account",
+      "name": "Northstar Analytics",
+      "tier": "enterprise",
+      "title": "Northstar Analytics"
+    },
+    {
+      "id": "GATE-DOC-101",
+      "kind": "document",
+      "title": "Northstar support note",
+      "ticketId": "GATE-TICKET-101",
+      "recordedAt": "2026-10-08T16:00:00Z",
+      "text": "Support acknowledged delayed reports; no purchase was authorized."
+    },
+    {
+      "id": "GATE-ISSUE-202",
+      "kind": "issue",
+      "title": "Harbor webhook retry backlog",
+      "status": "open",
+      "observedAt": "2026-10-09T10:00:00Z",
+      "ticketId": "GATE-TICKET-202",
+      "component": "webhook-delivery"
+    },
+    {
+      "id": "GATE-TICKET-202",
+      "kind": "ticket",
+      "title": "Webhook events delivered late",
+      "accountId": "GATE-ACCOUNT-202",
+      "openedAt": "2026-10-09T09:00:00Z",
+      "impact": "Delayed event processing"
+    },
+    {
+      "id": "GATE-ACCOUNT-202",
+      "kind": "account",
+      "name": "Harbor Systems",
+      "tier": "growth",
+      "title": "Harbor Systems"
+    },
+    {
+      "id": "GATE-DOC-202",
+      "kind": "document",
+      "title": "Harbor service commitment",
+      "ticketId": "GATE-TICKET-202",
+      "recordedAt": "2026-10-09T11:00:00Z",
+      "text": "Support committed to provide a status update by October 11; no remedy or purchase was approved."
+    },
+    {
+      "id": "GATE-ISSUE-303",
+      "kind": "issue",
+      "title": "Unlinked cache alarm",
+      "status": "open",
+      "observedAt": "2026-10-09T15:00:00Z",
+      "component": "cache"
+    },
+    {
+      "id": "GATE-ISSUE-404",
+      "kind": "issue",
+      "title": "Conflicting incident state",
+      "status": "open",
+      "observedAt": "2026-10-09T17:00:00Z",
+      "ticketId": "GATE-TICKET-404",
+      "component": "ingestion"
+    },
+    {
+      "id": "GATE-TICKET-404",
+      "kind": "ticket",
+      "title": "Ingestion delay",
+      "accountId": "GATE-ACCOUNT-404",
+      "openedAt": "2026-10-09T16:00:00Z",
+      "facts": [
+        {
+          "key": "incident_active",
+          "value": true,
+          "observedAt": "2026-10-09T16:00:00Z"
+        },
+        {
+          "key": "incident_active",
+          "value": false,
+          "observedAt": "2026-10-09T16:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "GATE-ACCOUNT-404",
+      "kind": "account",
+      "name": "Morrow Labs",
+      "title": "Morrow Labs"
+    },
+    {
+      "id": "GATE-ISSUE-505",
+      "kind": "issue",
+      "title": "Stale health observation",
+      "status": "open",
+      "observedAt": "2026-08-01T12:00:00Z",
+      "ticketId": "GATE-TICKET-505"
+    },
+    {
+      "id": "GATE-TICKET-505",
+      "kind": "ticket",
+      "title": "Old health alert",
+      "accountId": "GATE-ACCOUNT-505",
+      "openedAt": "2026-08-01T11:00:00Z"
+    },
+    {
+      "id": "GATE-ACCOUNT-505",
+      "kind": "account",
+      "name": "Silverline Co",
+      "title": "Silverline Co"
+    }
+  ]
+}

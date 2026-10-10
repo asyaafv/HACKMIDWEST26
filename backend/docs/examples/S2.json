@@ -1,0 +1,305 @@
+{
+  "request": {
+    "id": "c7b391e7-d086-414e-8a25-c485a8b450fc",
+    "version": 5,
+    "proposal": {
+      "source": {
+        "domain": "pm",
+        "sourceId": "GATE-ISSUE-101"
+      },
+      "agentId": "9c6920d1-e36a-4c3b-bbc2-611fd2f20929",
+      "purpose": "Synthetic browser acceptance diagnostics",
+      "category": "diagnostics",
+      "currency": "USD",
+      "projectId": "41e19cfa-9576-47d0-aff1-cf0ea56cead7",
+      "merchantId": "519bad17-0d17-40b1-a858-1f6745bf5fb0",
+      "amountMinor": "170000"
+    },
+    "workflowStatus": "COMPLETED",
+    "policyVerdict": "REVIEW",
+    "consentStatus": "GRANTED",
+    "authorizationStatus": "CONSUMED",
+    "decision": {
+      "rules": [
+        {
+          "code": "AGENT_ACTIVE",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        },
+        {
+          "code": "AGENT_REQUEST_CAP",
+          "actual": "170000",
+          "result": "PASS",
+          "severity": "HARD_DENY",
+          "threshold": "500000"
+        },
+        {
+          "code": "MERCHANT_ALLOWED",
+          "actual": "ALLOWED",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        },
+        {
+          "code": "BUDGET_AVAILABLE",
+          "actual": "170000",
+          "result": "PASS",
+          "severity": "HARD_DENY",
+          "threshold": "1000000"
+        },
+        {
+          "code": "DAILY_AMOUNT_CAP",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        },
+        {
+          "code": "DAILY_COUNT_CAP",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        }
+      ],
+      "factors": [
+        {
+          "code": "AMOUNT",
+          "points": 20
+        }
+      ],
+      "verdict": "REVIEW",
+      "inputHash": "9194ac430b6016d61bebbf7238ec51a20e5c93450d579003a117e22f1b73f449",
+      "riskScore": 20,
+      "policyHash": "c974005e8717a1d21d2b257d5ccc70c10aa01b0492f5f97fdb3603aaea77185c",
+      "policyVersion": "gate-policy-v1",
+      "executionAllowed": true,
+      "reviewRequirements": [
+        {
+          "code": "AMOUNT_REQUIRES_REVIEW",
+          "resolution": "HUMAN_JUDGMENT"
+        }
+      ],
+      "requiresHumanConsent": true
+    },
+    "evidence": {
+      "items": [
+        {
+          "id": "466d7ac3-6e23-5661-a681-2b72cc2b38ae",
+          "path": "main.json",
+          "domain": "pm",
+          "content": {
+            "id": "GATE-ISSUE-101",
+            "kind": "issue",
+            "title": "Northstar export queue delays",
+            "status": "open",
+            "ticketId": "GATE-TICKET-101",
+            "component": "export-queue",
+            "observedAt": "2026-10-08T14:00:00Z"
+          },
+          "locator": "main.json#/records/0",
+          "pointer": "/records/0",
+          "sourceId": "GATE-ISSUE-101",
+          "sourceHash": "926aa36933d99c9ef76a1ef790d39a61722f5e3af3be5372918c529785208b9a",
+          "contentHash": "1eb08e7d08e61dc63a8bde9d1167396ace72b59160e628cd85cf7b4378b15ed3",
+          "manifestHash": "ab0b415cc736fc2507e6ec2e800ced2425b53d06001e84b23028fa0a634fa563",
+          "datasetVersion": "SYNTHETIC_DEMO_DATA"
+        },
+        {
+          "id": "f87e2712-ba50-57d5-a46d-304a5f679f49",
+          "path": "main.json",
+          "domain": "crm",
+          "content": {
+            "id": "GATE-TICKET-101",
+            "kind": "ticket",
+            "title": "Delayed scheduled exports",
+            "impact": "Scheduled reports arrive late",
+            "openedAt": "2026-10-08T12:00:00Z",
+            "accountId": "GATE-ACCOUNT-101"
+          },
+          "locator": "main.json#/records/1",
+          "pointer": "/records/1",
+          "sourceId": "GATE-TICKET-101",
+          "sourceHash": "926aa36933d99c9ef76a1ef790d39a61722f5e3af3be5372918c529785208b9a",
+          "contentHash": "31bd0454eb9145ba07f105d2a1964fe2eeb677058e1573594dbd94036e7e3f6e",
+          "manifestHash": "ab0b415cc736fc2507e6ec2e800ced2425b53d06001e84b23028fa0a634fa563",
+          "datasetVersion": "SYNTHETIC_DEMO_DATA"
+        },
+        {
+          "id": "203a15e1-d923-5c8c-adb1-f5fa96120a7c",
+          "path": "main.json",
+          "domain": "crm",
+          "content": {
+            "id": "GATE-ACCOUNT-101",
+            "kind": "account",
+            "name": "Northstar Analytics",
+            "tier": "enterprise",
+            "title": "Northstar Analytics"
+          },
+          "locator": "main.json#/records/2",
+          "pointer": "/records/2",
+          "sourceId": "GATE-ACCOUNT-101",
+          "sourceHash": "926aa36933d99c9ef76a1ef790d39a61722f5e3af3be5372918c529785208b9a",
+          "contentHash": "0598a3f0eb043334adcfdf9e00b42ab469b2853663a211b1b6c5ad47b8bd9946",
+          "manifestHash": "ab0b415cc736fc2507e6ec2e800ced2425b53d06001e84b23028fa0a634fa563",
+          "datasetVersion": "SYNTHETIC_DEMO_DATA"
+        },
+        {
+          "id": "3f5a2976-9d87-5f6f-a339-269fcc82bdd9",
+          "path": "main.json",
+          "domain": "document",
+          "content": {
+            "id": "GATE-DOC-101",
+            "kind": "document",
+            "text": "Support acknowledged delayed reports; no purchase was authorized.",
+            "title": "Northstar support note",
+            "ticketId": "GATE-TICKET-101",
+            "recordedAt": "2026-10-08T16:00:00Z"
+          },
+          "locator": "main.json#/records/3",
+          "pointer": "/records/3",
+          "sourceId": "GATE-DOC-101",
+          "sourceHash": "926aa36933d99c9ef76a1ef790d39a61722f5e3af3be5372918c529785208b9a",
+          "contentHash": "e4788810954f33758bebbfa2d64a8b3c155369dbf25681a402316e0bce9f975c",
+          "manifestHash": "ab0b415cc736fc2507e6ec2e800ced2425b53d06001e84b23028fa0a634fa563",
+          "datasetVersion": "SYNTHETIC_DEMO_DATA"
+        }
+      ],
+      "links": [
+        {
+          "toId": "f87e2712-ba50-57d5-a46d-304a5f679f49",
+          "fromId": "466d7ac3-6e23-5661-a681-2b72cc2b38ae",
+          "basisPointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        },
+        {
+          "toId": "203a15e1-d923-5c8c-adb1-f5fa96120a7c",
+          "fromId": "f87e2712-ba50-57d5-a46d-304a5f679f49",
+          "basisPointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        },
+        {
+          "toId": "f87e2712-ba50-57d5-a46d-304a5f679f49",
+          "fromId": "3f5a2976-9d87-5f6f-a339-269fcc82bdd9",
+          "basisPointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ],
+      "missing": [],
+      "complete": true,
+      "coverage": {
+        "depth": 3,
+        "status": "COMPLETE",
+        "bounded": false
+      },
+      "bundleHash": "e24c6de71899f623d8b859e0a2beb03113ef6221b4f0d5b0da1998a9d1d6c815",
+      "referenceTime": "2026-10-10T12:00:00Z",
+      "unresolvedRequirements": []
+    },
+    "createdAt": "2026-10-10T21:34:42.250Z",
+    "mode": "sandbox",
+    "provider": "simulator",
+    "payment": {
+      "id": "8202f32b-7c27-4c65-b4b8-b494f0ea4f05",
+      "status": "SUCCEEDED",
+      "holdState": "CAPTURED",
+      "operationKey": "8202f32b-7c27-4c65-b4b8-b494f0ea4f05",
+      "amountMinor": "170000",
+      "receipt": {
+        "mode": "sandbox",
+        "label": "SIMULATED \u2014 NO MONEY MOVED",
+        "status": "SUCCEEDED",
+        "currency": "USD",
+        "provider": "simulator",
+        "createdAt": "2026-10-10T21:34:42.882Z",
+        "paymentId": "8202f32b-7c27-4c65-b4b8-b494f0ea4f05",
+        "amountMinor": "170000",
+        "destinationRef": "simulator:diagnostics",
+        "providerObjectId": "713d964f-edc1-487a-b734-5086ddf530e2"
+      },
+      "expiresAt": "2026-10-10T21:39:42.772Z"
+    },
+    "permittedActions": []
+  },
+  "preview": {
+    "id": "2915d705-f64a-4e26-8e01-b3283c86aad1",
+    "previewHash": "1016e26f8253d8efe5d19b2b74c698c44df3a88e16c7c481a553717b5607a743",
+    "expectedVersion": 2,
+    "expiresAt": "2026-10-10T21:39:42.621Z",
+    "requestId": "c7b391e7-d086-414e-8a25-c485a8b450fc",
+    "requestVersion": 2,
+    "proposal": {
+      "source": {
+        "domain": "pm",
+        "sourceId": "GATE-ISSUE-101"
+      },
+      "agentId": "9c6920d1-e36a-4c3b-bbc2-611fd2f20929",
+      "purpose": "Synthetic browser acceptance diagnostics",
+      "category": "diagnostics",
+      "currency": "USD",
+      "projectId": "41e19cfa-9576-47d0-aff1-cf0ea56cead7",
+      "merchantId": "519bad17-0d17-40b1-a858-1f6745bf5fb0",
+      "amountMinor": "170000"
+    },
+    "evidenceHash": "e24c6de71899f623d8b859e0a2beb03113ef6221b4f0d5b0da1998a9d1d6c815",
+    "policyHash": "c974005e8717a1d21d2b257d5ccc70c10aa01b0492f5f97fdb3603aaea77185c",
+    "agentVersion": 1,
+    "merchantVersion": 1,
+    "destinationRef": "simulator:diagnostics",
+    "mode": "sandbox",
+    "provider": "simulator",
+    "decision": {
+      "verdict": "REVIEW",
+      "riskScore": 20,
+      "factors": [
+        {
+          "code": "AMOUNT",
+          "points": 20
+        }
+      ],
+      "rules": [
+        {
+          "code": "AGENT_ACTIVE",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        },
+        {
+          "code": "AGENT_REQUEST_CAP",
+          "result": "PASS",
+          "severity": "HARD_DENY",
+          "actual": "170000",
+          "threshold": "500000"
+        },
+        {
+          "code": "MERCHANT_ALLOWED",
+          "result": "PASS",
+          "severity": "HARD_DENY",
+          "actual": "ALLOWED"
+        },
+        {
+          "code": "BUDGET_AVAILABLE",
+          "result": "PASS",
+          "severity": "HARD_DENY",
+          "actual": "170000",
+          "threshold": "1000000"
+        },
+        {
+          "code": "DAILY_AMOUNT_CAP",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        },
+        {
+          "code": "DAILY_COUNT_CAP",
+          "result": "PASS",
+          "severity": "HARD_DENY"
+        }
+      ],
+      "reviewRequirements": [
+        {
+          "code": "AMOUNT_REQUIRES_REVIEW",
+          "resolution": "HUMAN_JUDGMENT"
+        }
+      ],
+      "executionAllowed": true,
+      "requiresHumanConsent": true,
+      "policyVersion": "gate-policy-v1",
+      "policyHash": "c974005e8717a1d21d2b257d5ccc70c10aa01b0492f5f97fdb3603aaea77185c",
+      "inputHash": "9194ac430b6016d61bebbf7238ec51a20e5c93450d579003a117e22f1b73f449"
+    }
+  }
+}

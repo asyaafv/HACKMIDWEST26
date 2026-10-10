@@ -30,5 +30,16 @@ export interface Principal {
   credentialId: string;
   role: "OPERATOR" | "AGENT" | "FINANCE" | "AUDITOR" | "ADMIN";
   approvalLimitMinor: string;
+  capabilities?: string[];
+  authMethod?: "bearer" | "session";
 }
 export type FaultMode = "SUCCESS" | "DECLINE" | "TIMEOUT_AFTER_COMMIT";
+
+/** Additive v1 output shapes: nested domain records remain extensible. */
+export const workflowStatusSchema = z.enum(['COLLECTING','AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED','AUTHORIZED','EXECUTING','RECONCILING','COMPLETED','FAILED','CANCELLED','EXPIRED']);
+export const decisionSchema = z.looseObject({ verdict: z.enum(['APPROVE','REVIEW','REJECT']), executionAllowed: z.boolean(), requiresHumanConsent: z.boolean(), reviewRequirements: z.array(z.looseObject({ code: z.string(), resolution: z.string() })) });
+export const evidenceSchema = z.looseObject({ complete: z.boolean(), items: z.array(z.looseObject({ id: idSchema, domain: z.string(), sourceId: z.string() })), links: z.array(z.record(z.string(), z.unknown())), missing: z.array(z.string()), bundleHash: z.string() });
+export const requestResponseSchema = z.looseObject({ id: idSchema, version: z.number().int(), proposal: proposalSchema, workflowStatus: workflowStatusSchema, permittedActions: z.array(z.enum(['PREVIEW_CONSENT','CANCEL','RECONCILE'])).optional(), decision: decisionSchema, evidence: evidenceSchema, payment: z.looseObject({ id: idSchema, status: z.enum(['QUEUED','PROCESSING','UNKNOWN','SUCCEEDED','FAILED','CANCELLED']), holdState: z.enum(['HELD','CAPTURED','RELEASED']), amountMinor: moneySchema, receipt: z.unknown().nullable() }).nullable(), mode: z.literal('sandbox'), provider: z.literal('simulator') });
+export const previewResponseSchema = z.looseObject({ id: idSchema, requestId: idSchema, previewHash: z.string(), expectedVersion: z.number().int(), expiresAt: z.string(), proposal: proposalSchema, destinationRef: z.string(), decision: decisionSchema, evidenceHash: z.string(), policyHash: z.string(), mode: z.literal('sandbox'), provider: z.literal('simulator') });
+export const paymentResponseSchema = z.looseObject({ requestId: idSchema, paymentId: idSchema, workflowStatus: workflowStatusSchema, policyVerdict: z.enum(['APPROVE','REVIEW','REJECT']), consentStatus: z.literal('GRANTED'), authorizationStatus: z.enum(['READY','DISPATCHED','CONSUMED','REVOKED','EXPIRED','UNKNOWN']), paymentStatus: z.enum(['QUEUED','PROCESSING','UNKNOWN','SUCCEEDED','FAILED','CANCELLED']), holdState: z.enum(['HELD','CAPTURED','RELEASED']), amountMinor: moneySchema, operationKey: z.string(), receipt: z.unknown().nullable(), attempts: z.array(z.record(z.string(),z.unknown())), events: z.array(z.record(z.string(),z.unknown())), job: z.record(z.string(),z.unknown()).optional() });
+export const apiSchemas = Object.fromEntries(Object.entries({ Proposal: proposalSchema, Consent: consentSchema, Payment: paymentResponseSchema, Request: requestResponseSchema, Preview: previewResponseSchema, Principal: z.looseObject({ id: idSchema, orgId: idSchema, role: z.enum(['OPERATOR','AGENT','FINANCE','AUDITOR','ADMIN']), approvalLimitMinor: z.string(), capabilities: z.array(z.string()).optional(), authMethod: z.enum(['bearer','session']).optional() }) }).map(([name, schema]) => [name, z.toJSONSchema(schema, { unrepresentable: 'any' })]));

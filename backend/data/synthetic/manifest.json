@@ -1,0 +1,263 @@
+{
+  "datasetLabel": "SYNTHETIC_DEMO_DATA",
+  "datasetVersion": "1.0.0",
+  "referenceTime": "2026-10-10T12:00:00Z",
+  "files": [
+    {
+      "path": "main.json",
+      "sha256": "926aa36933d99c9ef76a1ef790d39a61722f5e3af3be5372918c529785208b9a"
+    },
+    {
+      "path": "restricted.json",
+      "sha256": "21673fd2071ae3d06afb986ff0214fb4b14e1b13e741cc72c2106ddf351ccda2"
+    }
+  ],
+  "records": [
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-101",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/0",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-101",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-101",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/1",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-101",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-101",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/2",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "document",
+      "sourceId": "GATE-DOC-101",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/3",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-101",
+          "pointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-202",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/4",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-202",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-202",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/5",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-202",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-202",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/6",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "document",
+      "sourceId": "GATE-DOC-202",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/7",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-202",
+          "pointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-303",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/8",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-404",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/9",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-404",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-404",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/10",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-404",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-404",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/11",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-505",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/12",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-505",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-505",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/13",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-505",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-505",
+      "project": "main",
+      "path": "main.json",
+      "pointer": "/records/14",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-909",
+      "project": "restricted",
+      "path": "restricted.json",
+      "pointer": "/records/0",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-909",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-909",
+      "project": "restricted",
+      "path": "restricted.json",
+      "pointer": "/records/1",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-909",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-909",
+      "project": "restricted",
+      "path": "restricted.json",
+      "pointer": "/records/2",
+      "idPointer": "/id",
+      "links": []
+    }
+  ]
+}

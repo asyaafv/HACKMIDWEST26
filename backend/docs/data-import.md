@@ -1,30 +1,15 @@
-# Approved evidence import
+# Synthetic demo import
 
-The initial adapter accepts JSON business exports. A trusted local operator maps actual organizer-approved records; the server does not guess field names or trust agent-supplied verification flags. Confirm organizer version/checksums separately: a self-created manifest is not proof of approval.
+The demo uses fictional `SYNTHETIC_DEMO_DATA` version 1.0.0 under `backend/data/synthetic/`. The fixed reference time is 2026-10-10T12:00:00Z. `manifest.json` pins SHA-256 source bytes, selectors, JSON pointers, project assignments, and typed relationships. The importer verifies these before a transaction and rejects drift on repeat imports. It never deletes requests, payments, or existing evidence.
 
-Example shape uses placeholders, not asserted Enterprise-Bench fields:
+After migrations, run from `backend/`:
 
-```json
-{
-  "datasetLabel": "ORGANIZER_PINNED_VERSION",
-  "files": [{ "path": "pm_json_data/records.json", "sha256": "ACTUAL_FILE_SHA256" }],
-  "records": [
-    {
-      "domain": "pm", "sourceId": "ACTUAL_ISSUE_ID",
-      "path": "pm_json_data/records.json", "pointer": "/records/0", "idPointer": "/id",
-      "links": [{ "domain": "crm", "sourceId": "ACTUAL_TICKET_ID", "pointer": "/linkedTicketId" }]
-    },
-    {
-      "domain": "crm", "sourceId": "ACTUAL_TICKET_ID",
-      "path": "pm_json_data/records.json", "pointer": "/records/1", "idPointer": "/id",
-      "links": []
-    }
-  ]
-}
+```sh
+node --env-file-if-exists=.env --import tsx scripts/seed.ts --prepare
 ```
 
-`pointer` locates the record in its original file. `idPointer` and link pointers are relative to that record. Empty pointer selects the JSON value; `~0`/`~1` escapes are supported. A relationship is accepted only when the original value exactly equals the mapped target ID. Similar titles/components do not establish causation.
+Chat 4 should register this as `demo:prepare` in `package.json`. Preparation creates the intended `Gate sandbox` organization only if absent, reuses it otherwise, and creates a separate restricted project. It prints only IDs, counts, label, and manifest hash. On first preparation, private credentials are written to ignored `work/demo-credentials.json` with mode 0600; do not publish that file. A preexisting development organization without a local credentials file requires an authorized operator to provision credentials separately. No dependency installation is needed.
 
-Before committing, importer verifies real-path root containment, no absolute/grader paths, file checksum, parse/pointer resolution, original ID equality, unique IDs, record bounds, and link targets. Every source is scoped to one project/organization. Runtime cannot edit imported evidence; duplicate IDs cannot silently replace an existing dataset.
+Main source selectors: `pm:GATE-ISSUE-101` → `crm:GATE-TICKET-101` → `crm:GATE-ACCOUNT-101`; and `pm:GATE-ISSUE-202` → `crm:GATE-TICKET-202` → `crm:GATE-ACCOUNT-202`. Missing link: `pm:GATE-ISSUE-303`. Contradiction: `crm:GATE-TICKET-404`. Stale primary: `pm:GATE-ISSUE-505`. Restricted source: `pm:GATE-ISSUE-909`. See `backend/fixtures/demo/scenarios.json` for proposals and expected outcomes, which are separate from business evidence.
 
-Current limits: JSON only, 16,000-character record body, direct references only, max 20 related records in a request bundle. Native DevRev retrieval, binary extraction, component joins, ARR aggregation, and historical-clock analysis are pending. Show missing evidence when a supported direct relationship does not exist; never fabricate one.
+For a manually selected tenant/project, `data:import` remains available with `<orgId> <projectId> <root> <manifest.json> [restrictedProjectId]`. Test fixtures stay outside this seed.

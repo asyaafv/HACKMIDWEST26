@@ -1,0 +1,787 @@
+{
+  "contractVersion": "1.0.0",
+  "schemas": {
+    "Proposal": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "merchantId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "amountMinor": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,11}$"
+        },
+        "currency": {
+          "type": "string",
+          "const": "USD"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "incident_response",
+            "diagnostics"
+          ]
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "domain": {
+              "type": "string",
+              "enum": [
+                "pm",
+                "crm",
+                "document"
+              ]
+            },
+            "sourceId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "domain",
+            "sourceId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "agentId",
+        "projectId",
+        "merchantId",
+        "amountMinor",
+        "currency",
+        "category",
+        "purpose",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "Consent": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "choice": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "previewId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "previewHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "reviewResolutions": {
+          "default": [],
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "required": [
+        "choice",
+        "previewId",
+        "previewHash",
+        "expectedVersion",
+        "reason",
+        "reviewResolutions"
+      ],
+      "additionalProperties": false
+    },
+    "Payment": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "paymentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "workflowStatus": {
+          "type": "string",
+          "enum": [
+            "COLLECTING",
+            "AWAITING_EVIDENCE",
+            "AWAITING_CONSENT",
+            "REJECTED",
+            "AUTHORIZED",
+            "EXECUTING",
+            "RECONCILING",
+            "COMPLETED",
+            "FAILED",
+            "CANCELLED",
+            "EXPIRED"
+          ]
+        },
+        "policyVerdict": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REVIEW",
+            "REJECT"
+          ]
+        },
+        "consentStatus": {
+          "type": "string",
+          "const": "GRANTED"
+        },
+        "authorizationStatus": {
+          "type": "string",
+          "enum": [
+            "READY",
+            "DISPATCHED",
+            "CONSUMED",
+            "REVOKED",
+            "EXPIRED",
+            "UNKNOWN"
+          ]
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": [
+            "QUEUED",
+            "PROCESSING",
+            "UNKNOWN",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED"
+          ]
+        },
+        "holdState": {
+          "type": "string",
+          "enum": [
+            "HELD",
+            "CAPTURED",
+            "RELEASED"
+          ]
+        },
+        "amountMinor": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,11}$"
+        },
+        "operationKey": {
+          "type": "string"
+        },
+        "receipt": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "job": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "requestId",
+        "paymentId",
+        "workflowStatus",
+        "policyVerdict",
+        "consentStatus",
+        "authorizationStatus",
+        "paymentStatus",
+        "holdState",
+        "amountMinor",
+        "operationKey",
+        "receipt",
+        "attempts",
+        "events"
+      ],
+      "additionalProperties": {}
+    },
+    "Request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "proposal": {
+          "type": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "merchantId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "amountMinor": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,11}$"
+            },
+            "currency": {
+              "type": "string",
+              "const": "USD"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "incident_response",
+                "diagnostics"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "source": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "enum": [
+                    "pm",
+                    "crm",
+                    "document"
+                  ]
+                },
+                "sourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "domain",
+                "sourceId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "agentId",
+            "projectId",
+            "merchantId",
+            "amountMinor",
+            "currency",
+            "category",
+            "purpose",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        "workflowStatus": {
+          "type": "string",
+          "enum": [
+            "COLLECTING",
+            "AWAITING_EVIDENCE",
+            "AWAITING_CONSENT",
+            "REJECTED",
+            "AUTHORIZED",
+            "EXECUTING",
+            "RECONCILING",
+            "COMPLETED",
+            "FAILED",
+            "CANCELLED",
+            "EXPIRED"
+          ]
+        },
+        "permittedActions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "PREVIEW_CONSENT",
+              "CANCEL",
+              "RECONCILE"
+            ]
+          }
+        },
+        "decision": {
+          "type": "object",
+          "properties": {
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "APPROVE",
+                "REVIEW",
+                "REJECT"
+              ]
+            },
+            "executionAllowed": {
+              "type": "boolean"
+            },
+            "requiresHumanConsent": {
+              "type": "boolean"
+            },
+            "reviewRequirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "resolution": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "resolution"
+                ],
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": [
+            "verdict",
+            "executionAllowed",
+            "requiresHumanConsent",
+            "reviewRequirements"
+          ],
+          "additionalProperties": {}
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "complete": {
+              "type": "boolean"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "domain",
+                  "sourceId"
+                ],
+                "additionalProperties": {}
+              }
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "missing": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "bundleHash": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "complete",
+            "items",
+            "links",
+            "missing",
+            "bundleHash"
+          ],
+          "additionalProperties": {}
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "QUEUED",
+                    "PROCESSING",
+                    "UNKNOWN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "CANCELLED"
+                  ]
+                },
+                "holdState": {
+                  "type": "string",
+                  "enum": [
+                    "HELD",
+                    "CAPTURED",
+                    "RELEASED"
+                  ]
+                },
+                "amountMinor": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,11}$"
+                },
+                "receipt": {
+                  "anyOf": [
+                    {},
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "holdState",
+                "amountMinor",
+                "receipt"
+              ],
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "const": "sandbox"
+        },
+        "provider": {
+          "type": "string",
+          "const": "simulator"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "proposal",
+        "workflowStatus",
+        "decision",
+        "evidence",
+        "payment",
+        "mode",
+        "provider"
+      ],
+      "additionalProperties": {}
+    },
+    "Preview": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "previewHash": {
+          "type": "string"
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "proposal": {
+          "type": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "merchantId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "amountMinor": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,11}$"
+            },
+            "currency": {
+              "type": "string",
+              "const": "USD"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "incident_response",
+                "diagnostics"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "source": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "enum": [
+                    "pm",
+                    "crm",
+                    "document"
+                  ]
+                },
+                "sourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "domain",
+                "sourceId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "agentId",
+            "projectId",
+            "merchantId",
+            "amountMinor",
+            "currency",
+            "category",
+            "purpose",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        "destinationRef": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "object",
+          "properties": {
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "APPROVE",
+                "REVIEW",
+                "REJECT"
+              ]
+            },
+            "executionAllowed": {
+              "type": "boolean"
+            },
+            "requiresHumanConsent": {
+              "type": "boolean"
+            },
+            "reviewRequirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "resolution": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "resolution"
+                ],
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": [
+            "verdict",
+            "executionAllowed",
+            "requiresHumanConsent",
+            "reviewRequirements"
+          ],
+          "additionalProperties": {}
+        },
+        "evidenceHash": {
+          "type": "string"
+        },
+        "policyHash": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "const": "sandbox"
+        },
+        "provider": {
+          "type": "string",
+          "const": "simulator"
+        }
+      },
+      "required": [
+        "id",
+        "requestId",
+        "previewHash",
+        "expectedVersion",
+        "expiresAt",
+        "proposal",
+        "destinationRef",
+        "decision",
+        "evidenceHash",
+        "policyHash",
+        "mode",
+        "provider"
+      ],
+      "additionalProperties": {}
+    },
+    "Principal": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "orgId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "OPERATOR",
+            "AGENT",
+            "FINANCE",
+            "AUDITOR",
+            "ADMIN"
+          ]
+        },
+        "approvalLimitMinor": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authMethod": {
+          "type": "string",
+          "enum": [
+            "bearer",
+            "session"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "role",
+        "approvalLimitMinor"
+      ],
+      "additionalProperties": {}
+    }
+  }
+}
