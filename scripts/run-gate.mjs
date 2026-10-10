@@ -123,14 +123,30 @@ async function dependencies(directory, env) {
   const old = await readFile(stamp, 'utf8').catch(() => '');
   const installed = await readFile(resolve(modules, '.package-lock.json'), 'utf8').then(JSON.parse).catch(() => null);
   const expected = JSON.parse(current);
-  const matches = installed && Object.entries(expected.packages).every(([path, entry]) => path === '' || installed.packages?.[path]?.version === entry.version);
+  const supported = (list, value) => !list || (!list.includes(`!${value}`) && (!list.some(item => !item.startsWith('!')) || list.includes(value)));
+  const matches = installed && Object.entries(expected.packages).every(([path, entry]) => path === '' || !supported(entry.os, process.platform) || !supported(entry.cpu, process.arch) || installed.packages?.[path]?.version === entry.version);
   if (old !== current && !matches) {
+    if (directory === backend && await portBusy(55432)) throw new Error('Backend dependencies changed while local PostgreSQL is running. Stop its owning terminal first, then rerun; the launcher will not replace a running database runtime.');
     await command(`Installing locked ${directory === backend ? 'backend' : 'frontend'} dependencies`, ['ci', '--cache', resolve(work, 'npm-cache')], directory, env);
   }
   if (old !== current) {
     const file = await open(stamp, 'w');
     try { await file.writeFile(current); } finally { await file.close(); }
   }
+}
+
+/** npm may silently omit optional binaries; make the local PostgreSQL platform package an explicit check. */
+async function postgresRuntime(env) {
+  const platform = process.platform === 'win32' ? 'windows' : process.platform;
+  const name = `@embedded-postgres/${platform}-${process.arch}`;
+  const requireBackend = createRequire(resolve(backend, 'package.json'));
+  try { requireBackend.resolve(name); return; } catch { /* Install the exact version already pinned in the lockfile. */ }
+  if (await portBusy(55432)) throw new Error('Local PostgreSQL is running with a missing runtime. Stop its owning terminal before repairing dependencies.');
+  const lock = JSON.parse(await readFile(resolve(backend, 'package-lock.json'), 'utf8'));
+  const version = lock.packages?.[`node_modules/${name}`]?.version;
+  if (!version) throw new Error(`No locked PostgreSQL runtime for ${platform}/${process.arch}. Use a separately configured local PostgreSQL server.`);
+  await command('Installing the locked local PostgreSQL runtime', ['install', '--no-save', '--package-lock=false', '--include=optional', '--fetch-retries=1', '--fetch-timeout=60000', `${name}@${version}`, '--cache', resolve(work, 'npm-cache')], backend, env);
+  requireBackend.resolve(name);
 }
 
 async function acquireLock() {
@@ -170,6 +186,7 @@ async function main() {
     const baseEnv = { ...process.env, NODE_ENV: 'development', APP_MODE: 'sandbox', HOST: '127.0.0.1' };
     await dependencies(backend, baseEnv);
     await dependencies(frontend, baseEnv);
+    await postgresRuntime(baseEnv);
     const requireBackend = createRequire(resolve(backend, 'package.json'));
     const { Pool } = requireBackend('pg');
     const databaseUrl = new URL(baseEnv.DATABASE_URL);
