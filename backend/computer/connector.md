@@ -1,16 +1,38 @@
-# Gate Computer connector
+# Gate Gatekeeper connector — deployment checklist
 
-Local authenticated MCP has been tested with a real SDK client. Remote hosting, DevRev registration, and second-user Computer reuse are not yet verified.
+Local stateless Streamable HTTP SDK calls use real scoped Gate identities and sandbox outcomes. Actual DevRev connector discovery/calls, installed custom skill, and second-human reuse remain **UNVERIFIED**. Platform menu labels, authentication support and setup routes have not been observed; confirm them with the authorized team administrator before recording exact instructions. Localhost is reachable only by local SDK callers.
 
-1. Confirm isolated playground, dataset/export pin, supported connector/auth setup, and approved host with the SE.
-2. Deploy API/worker/private database behind HTTPS. Set exact `MCP_ALLOWED_HOSTS` and `ALLOWED_ORIGINS`; preserve Authorization, Accept, and MCP headers.
-3. Register actual `https://YOUR_HOST/mcp` with stable Gate name/slug and secure bearer connection.
-4. Give each operator its own short-lived Gate credential/project grants. Keep tokens out of chats/skills.
-5. Verify `gate_capabilities`, context search, and advisory preview against actual imported sources.
-6. Deliberately permit reads; set `gate_request_spend` to Needs approval. That approval records a proposal, not a payment.
-7. Install the `gate-spend-review` skill and inspect actual calls in a fresh conversation.
-8. Finance consents through an authenticated Gate REST client until browser sessions exist; MCP exposes no finance approval.
-9. Retrieve request/explanation and verify the actual simulator receipt.
-10. Repeat with another authorized Computer user, separate credentials, and another source; save observed results.
+## Public deployment prerequisites
 
-Tools: `gate_capabilities`, `gate_search_context`, `gate_preview_spend`, `gate_request_spend`, `gate_get_request`, `gate_explain_request`. Proposal fields match REST camelCase; submission adds `idempotency_key`. Discovery is authoritative. Outputs above 32KB fail explicitly; use the scoped REST view instead of truncated evidence.
+1. Deploy persistent API, worker, and private PostgreSQL. Apply migrations using the admin/migration identity, including 030; run API and worker with the restricted runtime identity. Do not migrate or reset the shared development DB as a connector test.
+2. Terminate HTTPS at an approved public hostname. Configure an exact Host allowlist including actual forwarded host/port behavior. The proxy must preserve Authorization, Accept, Content-Type, MCP protocol headers and JSON bodies, and must not redirect `/mcp` to a login page. Configure `trustProxy` only for known proxy addresses with Chat 4; never trust arbitrary forwarded Host/IP headers. Restrict private backend ingress to that proxy.
+3. Configure exact allowed browser Origins (scheme, hostname, port), no wildcard. Pass these as attachMcp's fifth argument. Browser sessions use a host-only `__Host-gate_session` cookie: Secure, HttpOnly, SameSite=Strict. Use HTTPS for the browser origin. Cross-site UI hosting requires a separately reviewed cookie/CORS design; this default is same-site. MCP never authenticates from cookies.
+4. Provision one Gate AGENT identity/project/credential per submitting Gatekeeper using the commands below. A read-only investigator omits request:submit. TTL is 1–168 hours; default 24. Store the returned secret only in the approved connection secret store. It is a Gate credential, independent of DevRev/provider/finance credentials.
+5. Do not put secrets in URLs, source control, skills, screenshots or logs. Redact Authorization, Cookie, Set-Cookie, passwords and CSRF headers/bodies. Provisioning private output files use exclusive creation and mode 0600; keep them outside Git. Keep DB credentials in the host secret store. Rotate/revoke after the event and test next-call denial.
+6. Verify externally reachable authenticated SDK initialization/discovery and the ten versioned tools. Missing, expired and revoked tokens fail before tool disclosure. Validate wrong Host/Origin, source/request scope denial, and output errors. Tool output includes trace_id/server_version; dataset_version is null at the envelope until a single active version is configured, with actual source versions/hashes retained in evidence.
+7. Obtain the actual team skill and bindings. Review and hash a supplied version; install/bind through authorized platform controls only after verification. Read tools may be allowed; `gate_request_spend` needs explicit permission to record. This never grants finance consent. No arbitrary payment or finance-consent MCP tools exist.
+8. Record actual DevRev traces for context → advisory preview → permission to record → idempotent proposal → independent Gate finance consent → sandbox outcome → cited explanation. Include another authorized user's distinct credential/source, denied source, missing tool, negative trigger and timeout recovery. A shared connection is one Gate service identity; a chat name does not establish human identity.
+
+## Local provisioning and SDK commands
+
+Run from backend with an administrative DATABASE_URL supplied privately. These scripts deliberately are not new package/dependency edits.
+
+- `node --import tsx scripts/provision-gatekeeper.ts agent PRIVATE_INPUT_JSON PRIVATE_OUTPUT_JSON`
+- `node --import tsx scripts/provision-gatekeeper.ts human PRIVATE_INPUT_JSON`
+- `node --import tsx scripts/provision-gatekeeper.ts revoke PRIVATE_INPUT_JSON`
+- `node --import tsx scripts/gatekeeper-scenario.ts PRIVATE_SCENARIO_JSON`
+- `node --import tsx scripts/gatekeeper-manifest.ts` regenerates the committed versioned manifest; it never publishes to DevRev.
+
+Agent input: orgId, projectId, name, optional investigator, capMinor, expiresInHours. It creates an AGENT principal, linked agent (existing owner_id binding), project grant and scoped credential. Human input: orgId, principalId, username, password (12–256 characters), for an existing active non-AGENT principal. Password replacement revokes prior sessions. Revoke input: orgId, credentialId. Do not use financial identity tokens to provision a Gatekeeper.
+
+Scenario input (private): url, token, proposal matching discovered camelCase schema, permissionToRecord, persisted idempotencyKey; optional requestId to recover an existing outcome. Save the key before invocation. The driver calls actual SDK tools, does not consent or execute payments, and prints returned business context/outcomes without the credential. After a network loss it first lists existing requests then retries the identical proposal/key once; it never automatically retries a domain denial or chooses a new key. Finance consents separately; invoke with requestId later for the actual outcome.
+
+## Browser registration contract
+
+Register `authRoutes` from src/routes/auth.ts with `{db, origins, hosts}` under `/v1` (Chat 4 owns shared app registration). Endpoints: POST /v1/auth/login `{username,password}` → secure session cookie and `{data:{csrfToken,expiresIn}}`; GET /v1/auth/me → server identity/role/scopes/projects; POST /v1/auth/logout → revoke session and clear cookie. Me deliberately does not rotate or expose the CSRF secret; loss of the in-memory CSRF token requires login again. Responses use Cache-Control: no-store.
+
+Use `httpAuthenticate` plus `enforceHttpCapability` on REST routes. Cookie mutations require an exact allowed Origin and X-CSRF-Token from login, held only in memory. MCP is bearer-only. Enable the already installed Fastify rate-limit plugin before login registration (5 attempts/minute/IP); verify trusted proxy/IP behavior in deployment. No new password/cookie dependencies are required.
+
+## Proof still required
+
+Actual public URL and TLS/proxy/Host configuration; secure per-user connection support; verified platform setup labels; supplied team custom skill and version/hash; observed installation/triggers/discovery/calls; second authorized remote user and different source. Do not infer these from local SDK success or connector registration.

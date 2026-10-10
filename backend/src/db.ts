@@ -1,6 +1,21 @@
 /** PostgreSQL transactions pin tenant context to one connection, never to the pool. */
 import pg from "pg";
-export const { Pool } = pg;
+/** pg-pool resolves end before idle sockets close; await remove events before stopping PostgreSQL. */
+export class Pool extends pg.Pool {
+  override end(): Promise<void>;
+  override end(callback: () => void): void;
+  override end(callback?: (error?: Error) => void): Promise<void> | void {
+    let remaining = this.totalCount;
+    let complete!: () => void;
+    const closed = new Promise<void>(resolve => { complete = resolve; });
+    if (!remaining) complete();
+    const removed = () => { if (--remaining <= 0) complete(); };
+    this.on("remove", removed);
+    const result = super.end().then(() => closed).finally(() => this.off("remove", removed));
+    if (callback) { void result.then(() => callback(), error => callback(error)); return; }
+    return result;
+  }
+}
 export type DB = pg.Pool;
 export type Tx = pg.PoolClient;
 

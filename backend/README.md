@@ -1,12 +1,10 @@
 # Gate backend
 
-Gate checks agent purchase proposals against verified enterprise evidence and deterministic spending rules, then reserves budget and executes a sandbox transaction after independent finance consent.
-
-This first runnable slice includes Fastify REST, authenticated Streamable HTTP MCP, PostgreSQL tenant isolation and financial locks, approved JSON evidence import, a durable payment simulator/worker, and an append-only audit chain. Every payment is simulated; no money moves.
+Gate validates fictional synthetic incident context and deterministic spending controls, then holds budget and executes a durable sandbox transaction after independent finance consent. Gatekeepers use the scoped MCP interface. Every receipt is simulated; no money moves.
 
 ## Local setup
 
-Requires Node.js 20.19+ and npm. Run inside `backend/`:
+Requires Node.js 20.19+ and npm. Run from `backend/`:
 
 ```bash
 npm ci
@@ -14,62 +12,42 @@ cp .env.example .env
 npm run db:local
 ```
 
-Keep that database process running. In another terminal:
+Keep the database running. In another terminal, after coordinating migrations with any other backend owners:
 
 ```bash
 npm run db:migrate
-npm run demo:seed
-npm run dev
+npm run demo:prepare
+DEV_CONSOLE=true npm run dev
 ```
 
-In a third terminal:
+Start `npm run worker` separately. Open `http://127.0.0.1:8000/dev-console`. Default API and MCP remain `http://127.0.0.1:8000/v1` and `/mcp`. Existing `/health` remains available to the real frontend.
 
-```bash
-npm run worker
-```
+The console is enabled only with `DEV_CONSOLE=true`, local nonproduction binding, loopback clients and an allowed Host. Defaults include local port 8000 origins/hosts. Other ports require exact `ALLOWED_ORIGINS`, `BROWSER_ALLOWED_HOSTS`, and `MCP_ALLOWED_HOSTS`. Production binding with the console flag fails configuration validation. Development fault controls require the same local gate and an authenticated admin capability.
 
-API: `http://127.0.0.1:8000`; MCP: `http://127.0.0.1:8000/mcp`. `/health` preserves the existing frontend health button. `python3 backend/server.py` from the repo root also launches the active API after setup.
+`demo:prepare` reuses demo controls and imports the checksummed `SYNTHETIC_DEMO_DATA` 1.0.0 sources. It preserves requests/payments/history. New organizations write random private credentials to ignored `work/demo-credentials.json` with mode 0600; secrets are never printed. Existing expired/revoked credentials need authorized reprovisioning; repeating preparation does not rotate credentials or overwrite that file. `demo:seed` creates a new controls-only organization. Do not truncate a shared database to rerun scenarios.
 
-The optional local database uses real PostgreSQL 18 binaries from locked `embedded-postgres`, without Docker. All database files stay under ignored `backend/work`. It listens only on loopback; the example password is local-only.
+## Real console flow
 
-`demo:seed` creates controls and separate operator, finance, auditor, and admin identities. Random 24-hour bearer tokens are written to ignored `work/demo-credentials.json` with restrictive permissions, never printed. Each invocation creates a new isolated organization; it does not reset existing payments. **No enterprise evidence is seeded.**
+Use separate browser profiles for OPERATOR and FINANCE. Paste their private development tokens into Connect; tokens stay only in JavaScript memory and logout clears them. Select the assigned agent/project/allowed merchant, search `GATE-ISSUE-101`, select that exact source, and propose $1,700.00. The operator cannot approve.
 
-## Import evidence
+Finance opens the returned request ID, generates an exact server preview, inspects evidence/rules/destination/expiry, selects every required human review resolution, gives a reason and uses the keyboard-accessible authorization button. With the worker running, request state changes to the actual simulated receipt; held/spent/available balances, sources and audit events update from the API. Eligibility is never finance consent.
 
-Obtain the organizer-approved Enterprise-Bench export and dataset pin. Map its actual fields as described in [data-import.md](docs/data-import.md), then run:
+For $200 use the same independent consent flow. $6,000 is denied. `GATE-ISSUE-303` has missing context and cannot execute. An admin may select a fault on an already authorized, undispatched payment in the development console; pause only your own isolated worker before selecting faults. `DECLINE` releases the hold; `TIMEOUT_AFTER_COMMIT` shows UNKNOWN with retained funds and finance can retrieve the original payment. Cancellation is available only before dispatch. Retry lost responses using the same logical action, and refresh expired/stale previews before another choice.
 
-```bash
-npm run data:import -- <orgId> <projectId> <approved-data-directory> <mapping.json>
-```
+Browser session login is also wired: provision private human credentials with `gatekeeper:provision human PRIVATE_INPUT_JSON`, then use an HTTPS terminator with exact allowed Origin/Host. Sessions are Secure/HttpOnly/SameSite=Strict; mutations send the in-memory CSRF token. Revoke browser session explicitly on logout. MCP stays bearer-only. Do not weaken Secure cookies for a remote demo.
 
-Checksums, original source IDs, pointers, and direct links verify before one atomic import. Missing evidence yields `AWAITING_EVIDENCE`; caller flags cannot mark it verified. Incident context does not establish procurement approval or a proposed remedy's effectiveness.
-
-## REST and MCP
-
-[api.md](docs/api.md) provides the frontend contract. All `/v1` routes and `/mcp` require a bearer credential. Workflow mutations also require an idempotency key. Roles and project scopes come from server records.
-
-MCP previews/submits proposals and retrieves outcomes. It has no finance consent or arbitrary payment tool. Finance consent uses REST; browser login/session support is pending. Do not embed private tokens in checked-in frontend code or URLs.
-
-[computer/connector.md](computer/connector.md) describes actual tool names and setup checks. Remote hosting, DevRev installation, and second-user Computer reuse are not yet verified. The archived Python experiment lives in `legacy-readonly/` and is not the active backend.
-
-## Checks
+## Checks and contracts
 
 ```bash
 npm run typecheck
-npm test
 npm run build
-npm run audit:verify
+npm run contracts:export
+npx playwright install chromium
+npm test
 ```
 
-Tests start an isolated real PostgreSQL cluster with independent connections and clean it up. They require local PostgreSQL shared-memory and loopback permissions. Minimal test records are engineering fixtures, not hackathon business evidence.
+PostgreSQL suites use private temporary clusters and databases; they do not reset the development database. Tests run files serially. The baseline MCP test owns 58001 while running; coordinate other chats before the combined suite. Browser API port is 58555. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` can select an existing Chromium binary. The browser acceptance suite uses the actual seed, REST, independent identities and worker. `test:integration`, `test:concurrency`, `test:mcp`, and `test:e2e` select real checks.
 
-## Implementation boundaries
+See [API contracts](docs/api.md), [frontend handoff](docs/frontend-handoff.md), [integration status](docs/integration-status.md), [test report](docs/test-report.md), and [integration owner handoff](docs/handoffs/04-console-integration.md). `gatekeeper:scenario` invokes the real SDK driver; `gatekeeper:manifest` regenerates its actual schemas. `ledger:verify`, `audit:verify`, and `payment:recover` inspect existing durable state without creating a new payment.
 
-- Parameterized `pg` SQL and versioned migrations replace Prisma in this initial slice so locks and grants remain explicit.
-- The existing layout is retained: code and npm lockfile are under `backend`; frontend files are untouched.
-- Evidence collection is synchronous over an immutable import. Native DevRev retrieval, dataset switching, recollection, and broader formats are pending. Submit a new request after completing an import.
-- Config/policies are seeded and version-bound. Admin endpoints, browser sessions, fine-grained token scopes, cursor pagination, and richer duplicate-intent checks are pending.
-- Simulator success/decline/lost-response recovery are implemented. Stripe/Flex, signed webhooks, operational alerts, and manual reconciliation controls are pending.
-- Audit hashes verify against the stored head; external checkpoints and backup automation are pending.
-
-For deployment, use a private PostgreSQL server, separate migration owner credentials, and a nonsuperuser runtime login granted `gate_runtime`. API/worker assume the restricted role. Never deploy the local owner/password remotely. Configure exact HTTPS origins/MCP hosts and secret storage. [implementation-status.md](docs/implementation-status.md) records progress and remaining gates.
+Remote DevRev calls, the team's actual custom skill, hosted service and external payment sandbox remain unverified. A working local console is not proof of those integrations.

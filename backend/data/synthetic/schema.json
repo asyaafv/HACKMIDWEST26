@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SYNTHETIC_DEMO_DATA source record",
+  "type": "object",
+  "required": ["id", "kind", "title"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^GATE-(ISSUE|TICKET|ACCOUNT|DOC)-[0-9]+$"},
+    "kind": {"enum": ["issue", "ticket", "account", "document"]},
+    "title": {"type": "string"},
+    "ticketId": {"type": "string"},
+    "accountId": {"type": "string"},
+    "facts": {"type": "array", "items": {"type": "object", "required": ["key", "value", "observedAt"]}}
+  },
+  "additionalProperties": true
+}

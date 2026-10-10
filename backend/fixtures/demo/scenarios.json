@@ -1,0 +1,13 @@
+{
+  "label": "Gate demo proposals and expectations; separate from SYNTHETIC_DEMO_DATA business evidence",
+  "scenarios": [
+    { "id": "S1", "source": "GATE-ISSUE-101", "project": "main", "amountMinor": "20000", "merchant": "allowed", "expectedEligibility": "APPROVE" },
+    { "id": "S2", "source": "GATE-ISSUE-101", "project": "main", "amountMinor": "170000", "merchant": "allowed", "expectedEligibility": "REVIEW" },
+    { "id": "S3", "source": "GATE-ISSUE-101", "project": "main", "amountMinor": "600000", "merchant": "denied", "expectedEligibility": "REJECT" },
+    { "id": "S4", "source": "GATE-ISSUE-303", "project": "main", "amountMinor": "20000", "merchant": "allowed", "expectedEligibility": "REVIEW" },
+    { "id": "S5_DECLINE", "source": "GATE-ISSUE-202", "project": "main", "amountMinor": "20000", "merchant": "allowed", "fault": "DECLINE" },
+    { "id": "S5_TIMEOUT", "source": "GATE-ISSUE-202", "project": "main", "amountMinor": "20000", "merchant": "allowed", "fault": "TIMEOUT_AFTER_COMMIT" },
+    { "id": "S6", "source": "GATE-ISSUE-202", "project": "main", "amountMinor": "20000", "merchant": "allowed", "actor": "second-user" },
+    { "id": "S6_DENIED", "source": "GATE-ISSUE-909", "project": "restricted", "actor": "main-only-user", "expectedAccess": "DENIED" }
+  ]
+}
