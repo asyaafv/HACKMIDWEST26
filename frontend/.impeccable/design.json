@@ -1,0 +1,625 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T21:26:47.182454+00:00",
+  "title": "Design System: Gate",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0149 239.75)",
+          "oklch(26% 0.0149 239.75)",
+          "oklch(37% 0.0149 239.75)",
+          "oklch(49% 0.0149 239.75)",
+          "oklch(60% 0.0149 239.75)",
+          "oklch(72% 0.0149 239.75)",
+          "oklch(84% 0.0149 239.75)",
+          "oklch(95% 0.0149 239.75)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0200 248.83)",
+          "oklch(26% 0.0200 248.83)",
+          "oklch(37% 0.0200 248.83)",
+          "oklch(49% 0.0200 248.83)",
+          "oklch(60% 0.0200 248.83)",
+          "oklch(72% 0.0200 248.83)",
+          "oklch(84% 0.0200 248.83)",
+          "oklch(95% 0.0200 248.83)"
+        ]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Surface Raised",
+        "tonalRamp": [
+          "oklch(15% 0.0262 248.93)",
+          "oklch(26% 0.0262 248.93)",
+          "oklch(37% 0.0262 248.93)",
+          "oklch(49% 0.0262 248.93)",
+          "oklch(60% 0.0262 248.93)",
+          "oklch(72% 0.0262 248.93)",
+          "oklch(84% 0.0262 248.93)",
+          "oklch(95% 0.0262 248.93)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.0270 244.49)",
+          "oklch(26% 0.0270 244.49)",
+          "oklch(37% 0.0270 244.49)",
+          "oklch(49% 0.0270 244.49)",
+          "oklch(60% 0.0270 244.49)",
+          "oklch(72% 0.0270 244.49)",
+          "oklch(84% 0.0270 244.49)",
+          "oklch(95% 0.0270 244.49)"
+        ]
+      },
+      "text": {
+        "role": "primary",
+        "displayName": "Text",
+        "tonalRamp": [
+          "oklch(15% 0.0029 264.54)",
+          "oklch(26% 0.0029 264.54)",
+          "oklch(37% 0.0029 264.54)",
+          "oklch(49% 0.0029 264.54)",
+          "oklch(60% 0.0029 264.54)",
+          "oklch(72% 0.0029 264.54)",
+          "oklch(84% 0.0029 264.54)",
+          "oklch(95% 0.0029 264.54)"
+        ]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Secondary",
+        "tonalRamp": [
+          "oklch(15% 0.0434 249.41)",
+          "oklch(26% 0.0434 249.41)",
+          "oklch(37% 0.0434 249.41)",
+          "oklch(49% 0.0434 249.41)",
+          "oklch(60% 0.0434 249.41)",
+          "oklch(72% 0.0434 249.41)",
+          "oklch(84% 0.0434 249.41)",
+          "oklch(95% 0.0434 249.41)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0412 247.22)",
+          "oklch(26% 0.0412 247.22)",
+          "oklch(37% 0.0412 247.22)",
+          "oklch(49% 0.0412 247.22)",
+          "oklch(60% 0.0412 247.22)",
+          "oklch(72% 0.0412 247.22)",
+          "oklch(84% 0.0412 247.22)",
+          "oklch(95% 0.0412 247.22)"
+        ]
+      },
+      "green": {
+        "role": "tertiary",
+        "displayName": "Green",
+        "tonalRamp": [
+          "oklch(15% 0.1686 159.89)",
+          "oklch(26% 0.1686 159.89)",
+          "oklch(37% 0.1686 159.89)",
+          "oklch(49% 0.1686 159.89)",
+          "oklch(60% 0.1686 159.89)",
+          "oklch(72% 0.1686 159.89)",
+          "oklch(84% 0.1686 159.89)",
+          "oklch(95% 0.1686 159.89)"
+        ]
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "Red",
+        "tonalRamp": [
+          "oklch(15% 0.1931 26.57)",
+          "oklch(26% 0.1931 26.57)",
+          "oklch(37% 0.1931 26.57)",
+          "oklch(49% 0.1931 26.57)",
+          "oklch(60% 0.1931 26.57)",
+          "oklch(72% 0.1931 26.57)",
+          "oklch(84% 0.1931 26.57)",
+          "oklch(95% 0.1931 26.57)"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Amber",
+        "tonalRamp": [
+          "oklch(15% 0.1583 91.38)",
+          "oklch(26% 0.1583 91.38)",
+          "oklch(37% 0.1583 91.38)",
+          "oklch(49% 0.1583 91.38)",
+          "oklch(60% 0.1583 91.38)",
+          "oklch(72% 0.1583 91.38)",
+          "oklch(84% 0.1583 91.38)",
+          "oklch(95% 0.1583 91.38)"
+        ]
+      },
+      "action": {
+        "role": "primary",
+        "displayName": "Action",
+        "tonalRamp": [
+          "oklch(15% 0.0093 242.84)",
+          "oklch(26% 0.0093 242.84)",
+          "oklch(37% 0.0093 242.84)",
+          "oklch(49% 0.0093 242.84)",
+          "oklch(60% 0.0093 242.84)",
+          "oklch(72% 0.0093 242.84)",
+          "oklch(84% 0.0093 242.84)",
+          "oklch(95% 0.0093 242.84)"
+        ]
+      },
+      "action-text": {
+        "role": "primary",
+        "displayName": "Action Text",
+        "tonalRamp": [
+          "oklch(15% 0.0215 243.08)",
+          "oklch(26% 0.0215 243.08)",
+          "oklch(37% 0.0215 243.08)",
+          "oklch(49% 0.0215 243.08)",
+          "oklch(60% 0.0215 243.08)",
+          "oklch(72% 0.0215 243.08)",
+          "oklch(84% 0.0215 243.08)",
+          "oklch(95% 0.0215 243.08)"
+        ]
+      },
+      "action-hover": {
+        "role": "primary",
+        "displayName": "Action Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0241 244.16)",
+          "oklch(26% 0.0241 244.16)",
+          "oklch(37% 0.0241 244.16)",
+          "oklch(49% 0.0241 244.16)",
+          "oklch(60% 0.0241 244.16)",
+          "oklch(72% 0.0241 244.16)",
+          "oklch(84% 0.0241 244.16)",
+          "oklch(95% 0.0241 244.16)"
+        ]
+      },
+      "button-bg": {
+        "role": "neutral",
+        "displayName": "Button Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0264 242.26)",
+          "oklch(26% 0.0264 242.26)",
+          "oklch(37% 0.0264 242.26)",
+          "oklch(49% 0.0264 242.26)",
+          "oklch(60% 0.0264 242.26)",
+          "oklch(72% 0.0264 242.26)",
+          "oklch(84% 0.0264 242.26)",
+          "oklch(95% 0.0264 242.26)"
+        ]
+      },
+      "button-hover": {
+        "role": "neutral",
+        "displayName": "Button Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0377 244.71)",
+          "oklch(26% 0.0377 244.71)",
+          "oklch(37% 0.0377 244.71)",
+          "oklch(49% 0.0377 244.71)",
+          "oklch(60% 0.0377 244.71)",
+          "oklch(72% 0.0377 244.71)",
+          "oklch(84% 0.0377 244.71)",
+          "oklch(95% 0.0377 244.71)"
+        ]
+      },
+      "field-bg": {
+        "role": "neutral",
+        "displayName": "Field Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0220 243.41)",
+          "oklch(26% 0.0220 243.41)",
+          "oklch(37% 0.0220 243.41)",
+          "oklch(49% 0.0220 243.41)",
+          "oklch(60% 0.0220 243.41)",
+          "oklch(72% 0.0220 243.41)",
+          "oklch(84% 0.0220 243.41)",
+          "oklch(95% 0.0220 243.41)"
+        ]
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Field Border",
+        "tonalRamp": [
+          "oklch(15% 0.0337 245.47)",
+          "oklch(26% 0.0337 245.47)",
+          "oklch(37% 0.0337 245.47)",
+          "oklch(49% 0.0337 245.47)",
+          "oklch(60% 0.0337 245.47)",
+          "oklch(72% 0.0337 245.47)",
+          "oklch(84% 0.0337 245.47)",
+          "oklch(95% 0.0337 245.47)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.0510 250.20)",
+          "oklch(26% 0.0510 250.20)",
+          "oklch(37% 0.0510 250.20)",
+          "oklch(49% 0.0510 250.20)",
+          "oklch(60% 0.0510 250.20)",
+          "oklch(72% 0.0510 250.20)",
+          "oklch(84% 0.0510 250.20)",
+          "oklch(95% 0.0510 250.20)"
+        ]
+      },
+      "container-bg": {
+        "role": "neutral",
+        "displayName": "Container Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0230 246.26)",
+          "oklch(26% 0.0230 246.26)",
+          "oklch(37% 0.0230 246.26)",
+          "oklch(49% 0.0230 246.26)",
+          "oklch(60% 0.0230 246.26)",
+          "oklch(72% 0.0230 246.26)",
+          "oklch(84% 0.0230 246.26)",
+          "oklch(95% 0.0230 246.26)"
+        ]
+      },
+      "container-border": {
+        "role": "neutral",
+        "displayName": "Container Border",
+        "tonalRamp": [
+          "oklch(15% 0.0285 244.73)",
+          "oklch(26% 0.0285 244.73)",
+          "oklch(37% 0.0285 244.73)",
+          "oklch(49% 0.0285 244.73)",
+          "oklch(60% 0.0285 244.73)",
+          "oklch(72% 0.0285 244.73)",
+          "oklch(84% 0.0285 244.73)",
+          "oklch(95% 0.0285 244.73)"
+        ]
+      },
+      "selected-row": {
+        "role": "neutral",
+        "displayName": "Selected Row",
+        "tonalRamp": [
+          "oklch(15% 0.0261 248.91)",
+          "oklch(26% 0.0261 248.91)",
+          "oklch(37% 0.0261 248.91)",
+          "oklch(49% 0.0261 248.91)",
+          "oklch(60% 0.0261 248.91)",
+          "oklch(72% 0.0261 248.91)",
+          "oklch(84% 0.0261 248.91)",
+          "oklch(95% 0.0261 248.91)"
+        ]
+      },
+      "approved-text": {
+        "role": "tertiary",
+        "displayName": "Approved Text",
+        "tonalRamp": [
+          "oklch(15% 0.1567 160.66)",
+          "oklch(26% 0.1567 160.66)",
+          "oklch(37% 0.1567 160.66)",
+          "oklch(49% 0.1567 160.66)",
+          "oklch(60% 0.1567 160.66)",
+          "oklch(72% 0.1567 160.66)",
+          "oklch(84% 0.1567 160.66)",
+          "oklch(95% 0.1567 160.66)"
+        ]
+      },
+      "approved-bg": {
+        "role": "tertiary",
+        "displayName": "Approved Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0456 167.31)",
+          "oklch(26% 0.0456 167.31)",
+          "oklch(37% 0.0456 167.31)",
+          "oklch(49% 0.0456 167.31)",
+          "oklch(60% 0.0456 167.31)",
+          "oklch(72% 0.0456 167.31)",
+          "oklch(84% 0.0456 167.31)",
+          "oklch(95% 0.0456 167.31)"
+        ]
+      },
+      "pending-text": {
+        "role": "tertiary",
+        "displayName": "Pending Text",
+        "tonalRamp": [
+          "oklch(15% 0.1617 91.39)",
+          "oklch(26% 0.1617 91.39)",
+          "oklch(37% 0.1617 91.39)",
+          "oklch(49% 0.1617 91.39)",
+          "oklch(60% 0.1617 91.39)",
+          "oklch(72% 0.1617 91.39)",
+          "oklch(84% 0.1617 91.39)",
+          "oklch(95% 0.1617 91.39)"
+        ]
+      },
+      "pending-bg": {
+        "role": "tertiary",
+        "displayName": "Pending Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0394 95.64)",
+          "oklch(26% 0.0394 95.64)",
+          "oklch(37% 0.0394 95.64)",
+          "oklch(49% 0.0394 95.64)",
+          "oklch(60% 0.0394 95.64)",
+          "oklch(72% 0.0394 95.64)",
+          "oklch(84% 0.0394 95.64)",
+          "oklch(95% 0.0394 95.64)"
+        ]
+      },
+      "blocked-text": {
+        "role": "tertiary",
+        "displayName": "Blocked Text",
+        "tonalRamp": [
+          "oklch(15% 0.1908 26.49)",
+          "oklch(26% 0.1908 26.49)",
+          "oklch(37% 0.1908 26.49)",
+          "oklch(49% 0.1908 26.49)",
+          "oklch(60% 0.1908 26.49)",
+          "oklch(72% 0.1908 26.49)",
+          "oklch(84% 0.1908 26.49)",
+          "oklch(95% 0.1908 26.49)"
+        ]
+      },
+      "blocked-bg": {
+        "role": "tertiary",
+        "displayName": "Blocked Bg",
+        "tonalRamp": [
+          "oklch(15% 0.0378 17.27)",
+          "oklch(26% 0.0378 17.27)",
+          "oklch(37% 0.0378 17.27)",
+          "oklch(49% 0.0378 17.27)",
+          "oklch(60% 0.0378 17.27)",
+          "oklch(72% 0.0378 17.27)",
+          "oklch(84% 0.0378 17.27)",
+          "oklch(95% 0.0378 17.27)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Queue Heading",
+        "purpose": "Authorization queue heading; mobile size 32px."
+      },
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "Shared non-queue page headings; mobile size 30px."
+      },
+      "headline": {
+        "displayName": "Section Heading",
+        "purpose": "Base h2 section hierarchy."
+      },
+      "title": {
+        "displayName": "Detail Section",
+        "purpose": "Detail panel h3 hierarchy."
+      },
+      "body": {
+        "displayName": "Supporting Explanation",
+        "purpose": "Compact explanatory detail text."
+      },
+      "field": {
+        "displayName": "Field Content",
+        "purpose": "Readable form input and textarea content."
+      },
+      "label": {
+        "displayName": "Control Label",
+        "purpose": "Button labels and table headings."
+      },
+      "amount": {
+        "displayName": "Selected Amount",
+        "purpose": "Dominant detail-panel monetary value; tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "workspace-popover",
+        "value": "0 12px 32px #0005",
+        "purpose": "Workspace chooser."
+      },
+      {
+        "name": "search-results",
+        "value": "0 20px 40px #0008",
+        "purpose": "Global search results."
+      },
+      {
+        "name": "detail-overlay",
+        "value": "-15px 10px 35px #0004",
+        "purpose": "Detail panel only below 1536px."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 90px #0008",
+        "purpose": "Native modal dialog."
+      },
+      {
+        "name": "toast",
+        "value": "0 10px 30px #0005",
+        "purpose": "Saved-change and error notices."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": "150ms ease",
+        "purpose": "Button background and border transitions."
+      },
+      {
+        "name": "panel-dialog-entry",
+        "value": "180ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "Detail and dialog entries, with 8px translation; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "detail-overlay",
+        "value": "1535px"
+      },
+      {
+        "name": "narrow-desktop",
+        "value": "1199px"
+      },
+      {
+        "name": "navigation-drawer",
+        "value": "1023px"
+      },
+      {
+        "name": "mobile",
+        "value": "767px"
+      },
+      {
+        "name": "small-mobile",
+        "value": "359px"
+      }
+    ],
+    "layout": {
+      "sidebarWidth": "240px",
+      "headerHeight": "70px",
+      "detailWidth": "456px",
+      "narrowSidebarWidth": "220px",
+      "tableMinWidth": "900px",
+      "mobileTableMinWidth": "910px",
+      "layers": {
+        "shell": 10,
+        "dropdown": 25,
+        "detailBackdrop": 30,
+        "overlay": 40,
+        "navigation": 50,
+        "toast": 70,
+        "nativeDialog": "top layer"
+      }
+    },
+    "provenance": {
+      "sources": [
+        "src/styles.css",
+        "src/main.tsx",
+        "src/App.tsx",
+        "src/components.tsx",
+        "src/pages.tsx",
+        "src/TransactionPanel.tsx",
+        "PRODUCT.md",
+        ".impeccable/surface.md",
+        "ASSETS.json"
+      ],
+      "authority": "User-supplied dashboard with approved Gate identity and original circular portrait treatment.",
+      "tonalRamps": "Synthesized OKLCH visualization metadata only; not additional shipped colors or permission to introduce new tones.",
+      "scope": "Documented from source and original screenshot. Runtime finish validation is owned by the parent task."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "description": "Create request",
+      "html": "<button type=\"button\" class=\"ds-primary\">Create request</button>",
+      "css": ".ds-primary{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:40px;padding:9px 15px;border:1px solid #334352;border-radius:8px;font:600 13px Inter,sans-serif;white-space:nowrap;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease;background:var(--action,#edf3f8);color:var(--action-text,#111b23);border-color:var(--action,#edf3f8);}.ds-primary:hover{background:var(--action-hover,#d1e0ed);border-color:var(--action-hover,#d1e0ed);}.ds-primary:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }.ds-primary:disabled{opacity:.45;cursor:not-allowed;}@media(prefers-reduced-motion:reduce){.ds-primary{transition-duration:0s;}}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "description": "Cancel",
+      "html": "<button type=\"button\" class=\"ds-secondary\">Cancel</button>",
+      "css": ".ds-secondary{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:40px;padding:9px 15px;border:1px solid #334352;border-radius:8px;font:600 13px Inter,sans-serif;white-space:nowrap;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease;background:var(--button-bg,#14212b);color:var(--text,#f4f5f7);}.ds-secondary:hover{background:var(--button-hover,#243747);border-color:#586b7d;}.ds-secondary:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }.ds-secondary:disabled{opacity:.45;cursor:not-allowed;}@media(prefers-reduced-motion:reduce){.ds-secondary{transition-duration:0s;}}",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Danger action",
+      "kind": "button",
+      "description": "Block request",
+      "html": "<button type=\"button\" class=\"ds-danger\">Block request</button>",
+      "css": ".ds-danger{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:40px;padding:9px 15px;border:1px solid #334352;border-radius:8px;font:600 13px Inter,sans-serif;white-space:nowrap;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease;color:#ff9994;border-color:#663b3b;background:#2a1b1e;}.ds-danger:hover{background:#422327;border-color:#aa5651;}.ds-danger:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }.ds-danger:disabled{opacity:.45;cursor:not-allowed;}@media(prefers-reduced-motion:reduce){.ds-danger{transition-duration:0s;}}"
+    },
+    {
+      "name": "Labeled input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A dark form field with a written label and visible keyboard focus.",
+      "html": "<label class=\"ds-field\">Display name<input value=\"Jordan Davis\" /></label>",
+      "css": ".ds-field{display:block;color:var(--secondary,#bdd5ee);font:500 13px Inter,sans-serif;}.ds-field input{display:block;width:calc(100% - 26px);margin-top:8px;padding:11px 12px;background:var(--field-bg,#0b151d);border:1px solid var(--field-border,#344554);border-radius:7px;color:var(--text,#f4f5f7);font:400 14px/1.5 Inter,sans-serif;caret-color:#c5e1ff;}.ds-field input::placeholder{color:var(--muted,#90a7bd);}.ds-field input:focus{border-color:#b8d5ee;}.ds-field input:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }"
+    },
+    {
+      "name": "Sidebar navigation",
+      "kind": "nav",
+      "description": "Pale labels, regular Phosphor artwork, and a tonal selected row.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Example navigation\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#overview\"><svg aria-hidden=\"true\" width=\"25\" height=\"25\" viewBox=\"0 0 256 256\" fill=\"currentColor\"><path d=\"M240,208H224V136l2.34,2.34A8,8,0,0,0,237.66,127L139.31,28.68a16,16,0,0,0-22.62,0L18.34,127a8,8,0,0,0,11.32,11.31L32,136v72H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM48,120l80-80,80,80v88H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48Zm96,88H112V160h32Z\"/></svg>Overview</a></nav>",
+      "css": ".ds-nav{background:var(--bg,#0b1217);padding:14px;width:212px;}.ds-nav-item{display:flex;align-items:center;min-height:46px;padding:0 15px;gap:20px;color:var(--secondary,#bdd5ee);border-radius:8px;font:600 17px Inter,sans-serif;border-left:1px solid transparent;text-decoration:none;transition:background-color 150ms ease,border-color 150ms ease;}.ds-nav-item:hover{background:#131e27;}.ds-nav-item[aria-current=\"page\"]{color:var(--text,#f4f5f7);background:linear-gradient(110deg,#1c2834,#17212b);border-left-color:#c5dbef;}.ds-nav-item svg{flex-shrink:0;}.ds-nav-item:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }@media(prefers-reduced-motion:reduce){.ds-nav-item{transition-duration:0s;}}"
+    },
+    {
+      "name": "Decision badges",
+      "kind": "chip",
+      "refersTo": "status-approved",
+      "description": "Written semantic states; these badges are information, not buttons.",
+      "html": "<div class=\"ds-status-set\"><span class=\"ds-status ds-approved\">Approved</span><span class=\"ds-status ds-pending\">Pending</span><span class=\"ds-status ds-blocked\">Blocked</span></div>",
+      "css": ".ds-status-set{display:flex;flex-wrap:wrap;gap:8px;}.ds-status{display:inline-flex;align-items:center;justify-content:center;gap:9px;font:700 13px Inter,sans-serif;border-radius:6px;min-height:30px;box-sizing:border-box;padding:5px 11px;white-space:nowrap;}.ds-approved{color:var(--approved-text,#64f5b3);background:var(--approved-bg,#123428);}.ds-pending{color:var(--pending-text,#ffd340);background:var(--pending-bg,#302a12);}.ds-blocked{color:var(--blocked-text,#ff645b);background:var(--blocked-bg,#351d1e);}"
+    },
+    {
+      "name": "Container",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The shared card and editor material; artwork is omitted from this documentation preview.",
+      "html": "<article class=\"ds-card\"><h2>Procurement-07</h2><p class=\"ds-department\">procurement</p><p class=\"ds-description\">Purchases software and equipment for the team.</p><div class=\"ds-footer\">3 requests</div></article>",
+      "css": ".ds-card{border:1px solid var(--container-border,#263440);border-radius:12px;background:var(--container-bg,#111b24);padding:21px 21px 15px;color:var(--text,#f4f5f7);font-family:Inter,sans-serif;max-width:300px;}.ds-card h2{font-size:18px;font-weight:700;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere;}.ds-department{font-size:13px;color:var(--secondary,#bdd5ee);margin:4px 0 0;}.ds-description{font-size:13px;line-height:1.7;color:var(--secondary,#bdd5ee);margin:15px 0 23px;overflow-wrap:anywhere;}.ds-footer{padding-top:13px;border-top:1px solid var(--border,#1e2b36);font-size:12px;color:var(--muted,#90a7bd);}"
+    },
+    {
+      "name": "Count filter",
+      "kind": "chip",
+      "description": "A neutral pressed queue filter with tabular count.",
+      "html": "<button type=\"button\" class=\"ds-filter\" aria-pressed=\"true\">All<span class=\"ds-count\">24</span></button>",
+      "css": ".ds-filter{background:#0b141b;border:1px solid var(--border,#1e2b36);border-radius:8px;color:var(--secondary,#bdd5ee);height:40px;padding:0 11px;display:inline-flex;align-items:center;gap:8px;font:600 14px Inter,sans-serif;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease;}.ds-filter:hover{background:#1b2833;}.ds-filter[aria-pressed=\"true\"]{background:linear-gradient(135deg,#2a3849,#1c2835);border-color:#8398b0;color:white;}.ds-count{display:inline-flex;align-items:center;justify-content:center;height:23px;min-width:23px;padding:0 6px;box-sizing:border-box;background:#1c2835;border-radius:6px;font:700 13px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:var(--text,#f4f5f7);}.ds-filter[aria-pressed=\"true\"] .ds-count{background:#3a495c;}.ds-filter:focus-visible { outline: 2px solid var(--focus, #c5e1ff); outline-offset: 4px; }@media(prefers-reduced-motion:reduce){.ds-filter{transition-duration:0s;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Authorization Workspace",
+    "overview": "Gate uses the user-supplied dark dashboard as visual authority: cool near-black surfaces, pale blue supporting text, white Inter headings, thin separators, and compact decision badges. The interface stays dense enough to scan transactions while keeping the selected request and its business evidence readable.\n\nThe supplied rainbow logo and ten character portraits carry the identity. Original raster bytes remain unchanged; circular crops happen in CSS. This is an extraction of the finished React implementation, not permission to invent a new visual direction. The approved navigation and page name is Gatekeepers; the transaction table retains its Agent column.",
+    "keyCharacteristics": [
+      "Dark tonal layers and thin structural separators.",
+      "Strong Inter headings above compact labels and numerical data.",
+      "Pale neutral primary actions; semantic color for decisions and risk.",
+      "Original artwork, circular portraits, and a persistent shared shell.",
+      "Selected transaction rows synchronized with an inspectable detail panel."
+    ],
+    "rules": [
+      {
+        "name": "The Neutral Action Rule",
+        "body": "Primary new-action controls use the pale neutral treatment; approval green, pending amber, and blocking red describe semantic state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Single Family Rule",
+        "body": "Use the shipped self-hosted Inter family for headings, content, and controls; preserve numerical alignment in monetary and count fields.",
+        "section": "typography"
+      },
+      {
+        "name": "The Queue Continuity Rule",
+        "body": "Keep the selected row and detail content synchronized, and preserve the queue around the request inspection flow.",
+        "section": "layout"
+      },
+      {
+        "name": "The Transient Depth Rule",
+        "body": "Preserve shadow-free ordinary content and reserve diffuse shadows for the shipped floating layers.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** preserve the supplied dashboard's cool dark surfaces, Inter hierarchy, separators, and compact density.",
+      "**Do** use pale neutral primary actions and written labels alongside decision colors.",
+      "**Do** preserve the original logo and ten portraits, using CSS circular crops and retaining asset provenance.",
+      "**Do** preserve responsive overlay focus, scrolling, and queue selection behavior when extending inspection screens.",
+      "**Do** reuse the shared shell, the shipped Phosphor family, and the existing component states."
+    ],
+    "donts": [
+      "**Don't** replace supplied artwork, add generated asset substitutes, or introduce an unapproved visual direction.",
+      "**Don't** repeat the rainbow logo outside the top-left brand.",
+      "**Don't** fill missing merchant imagery with substitute graphics, monograms, or visible placeholder boxes.",
+      "**Don't** squeeze the transaction table into illegible columns on mobile; retain horizontal scrolling.",
+      "**Don't** add redundant decorative eyebrows to form or section headings."
+    ]
+  }
+}
