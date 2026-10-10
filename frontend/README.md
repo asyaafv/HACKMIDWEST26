@@ -50,3 +50,10 @@ When hosting the production build, configure SPA fallback to `index.html` for th
 Merchant logo files are awaiting user delivery: GitHub, Delta, GiftCards.com, Google Ads, AWS, Deel, Notion, Stripe, FedEx, Linear. No merchant artwork is drawn, substituted, or downloaded. Their layout space remains reserved without displaying replacement graphics. Once provided, store the files under `public/assets/merchants/` and set each merchant's `logo` path in `src/data.ts`.
 
 The supplied screenshot remains the visual authority. The exact merchant artwork is the remaining dependency for completing those placements. Self-hosted Inter and Phosphor pictograms approximate the reference's type and interface glyphs.
+
+## Connected workspace
+
+Open `/live` for the real backend workflow; the designed demo remains separate.
+Run `./run-gate.sh` from the repository root for coordinated API/frontend ports.
+The local API proxy uses `GATE_API_URL` (default http://127.0.0.1:8000).
+See [integration flow](../backend/docs/integration-flow.md) for independent operator/finance testing and production HTTPS requirements.

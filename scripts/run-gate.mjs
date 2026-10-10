@@ -212,7 +212,7 @@ async function main() {
     const frontendPort = await freePort(parsePort(process.env.GATE_FRONTEND_PORT, 5173));
     const apiUrl = `http://127.0.0.1:${apiPort}`;
     const frontendUrl = `http://127.0.0.1:${frontendPort}`;
-    const serviceEnv = { ...baseEnv, PORT: String(apiPort), DEV_CONSOLE: 'true',
+    const serviceEnv = { ...baseEnv, PORT: String(apiPort), DEV_CONSOLE: 'true', GATE_API_URL: apiUrl,
       ALLOWED_ORIGINS: [...new Set([apiUrl, frontendUrl, `http://localhost:${apiPort}`, `http://localhost:${frontendPort}`, ...String(baseEnv.ALLOWED_ORIGINS ?? '').split(',').filter(Boolean)])].join(','),
       BROWSER_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}`,
       MCP_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}` };
@@ -227,7 +227,7 @@ async function main() {
     await sleep(750);
     if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);
     if (/dependency failure/i.test(await readFile(resolve(work, 'worker.log'), 'utf8'))) throw new Error(`Worker could not access its dependencies. See ${resolve(work, 'worker.log')}`);
-    console.log(`\nGate is ready.\n  Backend test console: ${apiUrl}/dev-console\n  Frontend visual demo: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Private demo tokens: ${resolve(work, 'demo-credentials.json')}\n  Service logs: ${work}\n\nUse the backend console to test actual approvals/payments. The current frontend uses its own demo data.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
+    console.log(`\nGate is ready.\n  Backend test console: ${apiUrl}/dev-console\n  Live frontend: ${frontendUrl}/live\n  Visual demo: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Private demo tokens: ${resolve(work, 'demo-credentials.json')}\n  Service logs: ${work}\n\nUse the live frontend or backend console to test actual approvals/payments. The visual demo remains separate.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
     if (args.has('--smoke')) { console.log('[Gate] Startup smoke check passed. Stopping owned services.'); return; }
     while (!stopRequested) {
       if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);
