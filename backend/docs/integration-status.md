@@ -13,3 +13,5 @@ Verified October 10, 2026: original console acceptance plus connected /live work
 - Hosted environment/external payment: UNVERIFIED. No public deployment or external provider configured; same-origin HTTPS human-session acceptance remains a release gate.
 
 A configuration flag or a recently seen worker process does not prove remote integration, this tenant's payment completion or another human's consent. The protected /v1/integrations response follows the same boundary. No public debug auth/fault controls are enabled by default.
+
+Public Render check October 10, 2026: hackmidwest26.onrender.com exposes the historical unauthenticated Python three-tool MCP contract; current REST health and /live routes return 404. See [Render deployment handoff](render-deployment.md). This is not the current backend deployment or proof of DevRev integration.
