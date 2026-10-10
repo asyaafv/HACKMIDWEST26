@@ -138,6 +138,7 @@ test('desktop and mobile layout, keyboard review, and overlay focus', async ({ p
   for (const width of [1672, 1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 941 });
     await page.goto('/overview');
+    await expect(page.locator('.gate-entrance')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '3 requests need your decision' })).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

@@ -72,6 +72,8 @@ test('policy edit, new request, review decision, and shared audit/counts', async
 
 test('settings save, notifications preference, and confirmed reset', async ({ page }) => {
   await page.goto('/settings');
+  // fill() can target inert inputs, so wait until the welcome releases the form.
+  await expect(page.locator('.gate-entrance')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Display name' }).fill('Casey Morgan');
   await page.getByRole('textbox', { name: 'Initials', exact: true }).fill('CM');
   await page.getByRole('textbox', { name: 'Workspace name' }).fill('Gate Lab');

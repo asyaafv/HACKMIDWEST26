@@ -102,6 +102,8 @@ test('pointer tracking yields to explicit look controls and returns smoothly', a
 test('a wink resumes from its frozen pose after pause and hidden-tab suspension', async ({ page }) => {
   await page.clock.install();
   await page.goto('/animation-preview');
+  // This test freezes time before the welcome can finish; dismiss it first.
+  await page.getByRole('button', { name: 'Skip intro' }).click();
   const rig = page.locator('.motion-stage .animated-avatar');
   await expect(rig).toHaveAttribute('data-running', 'true');
   await page.clock.pauseAt(new Date(Date.now() + 100));
