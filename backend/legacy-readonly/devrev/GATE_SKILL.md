@@ -1,7 +1,7 @@
-# AgentPay Procurement Review — DevRev Computer Skill
+# Gate Procurement Review — DevRev Computer Skill
 
 **Goal:** Help an authorized user investigate proposed AI-agent purchases
-using authentic Enterprise-Bench records and the AgentPay read-only policy
+using authentic Enterprise-Bench records and the Gate read-only policy
 preview. This skill never executes a payment.
 
 ## Required tools
@@ -9,9 +9,9 @@ preview. This skill never executes a payment.
 - Native DevRev Computer search/read tools for authorized Enterprise-Bench
   engineering issues, support tickets, components, and documents.
 - Our custom MCP tools:
-  - `agentpay_health`
-  - `agentpay_evidence_checklist`
-  - `agentpay_policy_preview`
+  - `gate_health`
+  - `gate_evidence_checklist`
+  - `gate_policy_preview`
 
 ## Inputs
 
@@ -28,14 +28,14 @@ If a field is absent, ask only for the minimum information necessary.
 3. Distinguish **documented business need** from **financial authorization**.
    A verified issue does not establish managerial approval, procurement
    budget, or approved merchant.
-4. Call `agentpay_evidence_checklist`. Identify missing records and policy data.
-5. Call `agentpay_policy_preview` using supplied simulated policy inputs.
+4. Call `gate_evidence_checklist`. Identify missing records and policy data.
+5. Call `gate_policy_preview` using supplied simulated policy inputs.
    Its `source_ids` field is advisory and not verified by the server.
 6. Return a concise report:
    - Purchase request
    - Verified Enterprise-Bench facts, each with a source reference
    - Unverified assumptions / evidence gaps
-   - AgentPay simulated policy preview, with reason
+   - Gate simulated policy preview, with reason
    - Explicit separate purchasing-approval status
    - Next action for an authorized human
 7. For a different authorized teammate, follow exactly the same process on a
@@ -54,7 +54,7 @@ If a field is absent, ask only for the minimum information necessary.
 ## Suggested first test prompt
 
 "Find one real open payment-processing issue in Maple Payments, cite its ID,
-show related support evidence, and run an AgentPay preview for a simulated
+show related support evidence, and run an Gate preview for a simulated
 $1,800 monitoring purchase. Explicitly distinguish verified business need
 from purchasing approval."
 

@@ -1,4 +1,4 @@
-"""Read-only AgentPay MCP server for DevRev Computer.
+"""Read-only Gate MCP server for DevRev Computer.
 
 Requires MCP Python SDK 2.x (requirements.txt).
 Phase 1 serves local Streamable HTTP at http://127.0.0.1:8000/mcp.
@@ -9,19 +9,19 @@ import os
 from mcp.server import MCPServer
 from policy import policy_preview, evidence_checklist
 
-mcp = MCPServer("AgentPay", log_level="INFO")
+mcp = MCPServer("Gate", log_level="INFO")
 
 
 @mcp.tool()
-def agentpay_health() -> dict:
-    """Check AgentPay MCP connectivity; returns no private information."""
+def gate_health() -> dict:
+    """Check Gate MCP connectivity; returns no private information."""
     return {
-        "service": "AgentPay",
+        "service": "Gate",
         "status": "ready",
         "phase": "1-read-only",
         "tools": [
-            "agentpay_health", "agentpay_policy_preview",
-            "agentpay_evidence_checklist",
+            "gate_health", "gate_policy_preview",
+            "gate_evidence_checklist",
         ],
         "live_devrev_connection": False,
         "payments_enabled": False,
@@ -29,7 +29,7 @@ def agentpay_health() -> dict:
 
 
 @mcp.tool()
-def agentpay_evidence_checklist(
+def gate_evidence_checklist(
     issue_id: str = "", purchase_purpose: str = ""
 ) -> dict:
     """List needed Enterprise-Bench evidence and purchasing approval checks.
@@ -41,7 +41,7 @@ def agentpay_evidence_checklist(
 
 
 @mcp.tool()
-def agentpay_policy_preview(
+def gate_policy_preview(
     request_id: str,
     amount_usd: float,
     merchant: str,
