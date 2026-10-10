@@ -28,6 +28,7 @@ export class AvatarMotion {
   private phaseEnd = 1100;
   private nextBlink = 2400;
   private blinkSuppressedUntil = 0;
+  private ambientReturnAt: number | null = null;
   private tracking = false;
   private pointerGoal: Point = { ...CENTER };
   constructor(private random: () => number = Math.random) {
@@ -36,7 +37,18 @@ export class AvatarMotion {
   private move(to: Point, duration: number) {
     this.transition = { from: { ...this.gaze }, to, start: this.time, duration };
   }
+  rest() {
+    this.mode = 'idle'; this.eyes = [1, 1]; this.gaze = { ...CENTER }; this.sway = { ...CENTER };
+    this.transition = null; this.gesture = null; this.ambientReturnAt = null; this.tracking = false;
+  }
+  playAmbient(action: 'glance' | 'blink' | 'wink') {
+    if (action !== 'glance') { this.command(action, false); return; }
+    this.mode = 'idle';
+    this.move({ x: (this.random() < .5 ? -1 : 1) * (36 + this.random() * 6), y: (this.random() * 2 - 1) * 16 }, 500);
+    this.ambientReturnAt = this.time + 2000;
+  }
   command(mode: Expression, reduced: boolean) {
+    this.ambientReturnAt = null;
     this.mode = mode;
     this.tracking = false;
     this.gesture = { kind: mode === 'blink' || mode === 'wink' || mode === 'closed' ? mode : 'open', start: this.time, from: [...this.eyes] };
@@ -52,7 +64,7 @@ export class AvatarMotion {
       this.sway = { ...CENTER };
     }
   }
-  step(dt: number, pointer: Point | null, reduced: boolean) {
+  step(dt: number, pointer: Point | null, reduced: boolean, automatic = true) {
     this.time += dt;
     const t = this.time;
     const g = this.gesture;
@@ -80,6 +92,7 @@ export class AvatarMotion {
       }
       if (gestureFinished) { this.eyes = [1, 1]; this.gesture = null; }
     }
+    if (this.ambientReturnAt !== null && t >= this.ambientReturnAt) { this.move(CENTER, 600); this.ambientReturnAt = null; }
     const freezeGaze = this.gesture?.kind === 'blink' || this.gesture?.kind === 'wink';
     if (freezeGaze) {
       // Shift gaze deadlines so a gesture cannot consume the glance/hold duration.
@@ -95,7 +108,7 @@ export class AvatarMotion {
         this.tracking = true;
       } else if (this.tracking) {
         this.tracking = false; this.move(CENTER, 300); this.phase = 'return'; this.phaseEnd = t + 300;
-      } else if ((this.mode === 'idle' || this.mode === 'blink' || this.mode === 'wink') && t >= this.phaseEnd) {
+      } else if (automatic && (this.mode === 'idle' || this.mode === 'blink' || this.mode === 'wink') && t >= this.phaseEnd) {
         if (this.phase === 'center') {
           const x = (this.random() < .5 ? -1 : 1) * (36 + this.random() * 6);
           const y = (this.random() * 2 - 1) * 16;
@@ -113,7 +126,7 @@ export class AvatarMotion {
     const follow = 1 - Math.exp(-dt / 100);
     this.sway.x = mix(this.sway.x, this.gaze.x / 42 * 8, follow);
     this.sway.y = mix(this.sway.y, this.gaze.y / 16 * 3, follow);
-    if (!this.gesture && this.mode !== 'closed' && t >= this.nextBlink && t >= this.blinkSuppressedUntil) {
+    if (automatic && !this.gesture && this.mode !== 'closed' && t >= this.nextBlink && t >= this.blinkSuppressedUntil) {
       this.gesture = { kind: 'blink', start: t, from: [...this.eyes] };
       this.nextBlink = t + 3200 + this.random() * 3500;
     }

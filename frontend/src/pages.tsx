@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, CalendarBlank, CaretDown, CaretRight, Plus, MagnifyingGlass, PencilSimple, Pause, Play, CheckCircle, ShieldCheck, WarningCircle, ArrowsClockwise, Funnel, ClockCounterClockwise } from '@phosphor-icons/react';
 import { useDemo } from './context';
 import { ago, dateLabel, merchants, money } from './data';
 import { Avatar, Dialog, Empty, FormFooter, IconButton, MerchantImage, PageTitle, PriorityBadge, Status, SubmitButton, TextLink } from './components';
 import { GatekeeperForm, RequestForm } from './forms';
+import { pendingRequests } from './decisions';
 import { TransactionPanel } from './TransactionPanel';
 import type { Decision, Gatekeeper, Policy, Transaction } from './types';
 
@@ -40,6 +41,33 @@ export function Transactions() {
   </main>{selected && <TransactionPanel transaction={selected} onClose={close} onPrevious={() => { if (index > 0) choose(visible[index - 1].id); }} onNext={() => { if (index >= 0 && index < visible.length - 1) choose(visible[index + 1].id); }} hasPrevious={index > 0} hasNext={index >= 0 && index < visible.length - 1} />}{create && <RequestForm onClose={() => setCreate(false)} onCreated={id => { setFilter('All'); choose(id); }} />}</div>;
 }
 
+export function Decisions() {
+  const { state } = useDemo();
+  const [params, setParams] = useSearchParams();
+  const [confirmation, setConfirmation] = useState('');
+  const completionRef = useRef<HTMLDivElement>(null);
+  const pending = pendingRequests(state!.transactions);
+  const selectedId = params.get('request');
+  const selected = pending.find(t => t.id === selectedId);
+  const stale = selectedId ? state!.transactions.find(t => t.id === selectedId && t.decision !== 'Pending') : undefined;
+  const index = pending.findIndex(t => t.id === selectedId);
+  const choose = useCallback((id?: string) => setParams(id ? { request: id } : {}), [setParams]);
+  const close = useCallback(() => choose(), [choose]);
+  useEffect(() => { if (confirmation && !pending.length) completionRef.current?.focus(); }, [confirmation, pending.length]);
+  const saved = (decision: 'Approved' | 'Blocked') => {
+    const remaining = pending.filter(t => t.id !== selectedId);
+    const next = pending[index + 1] ?? remaining[0];
+    setConfirmation(`${selectedId} ${decision.toLowerCase()}. ${next ? 'Next pending request opened.' : 'All requests have been reviewed.'}`);
+    choose(next?.id);
+  };
+  return <div className={`transaction-workspace ${selected ? 'with-detail' : ''}`}><main className="queue-main">
+    <PageTitle title="Needs a decision" description="Review the evidence. Make the call." action={pending.length && !selected ? <button type="button" className="button primary" onClick={() => choose(pending[0].id)}>Review next request<ArrowRight size={18} /></button> : undefined} />
+    <p className="decision-confirmation" role="status" aria-live="polite" aria-atomic="true">{confirmation}</p>
+    {selectedId && !selected && <div className="decision-link-notice"><WarningCircle size={22} aria-hidden="true" /><div><p>{stale ? `${stale.id} has already been ${stale.decision.toLowerCase()}.` : 'This request is no longer available in the decision inbox.'}</p><div className="decision-link-actions">{pending.length > 0 && <button type="button" className="text-link" onClick={() => choose(pending[0].id)}>Review next request<ArrowRight size={17} /></button>}{stale && <Link className="text-link" to={`/transactions?request=${stale.id}`}>View transaction details<ArrowRight size={17} /></Link>}</div></div></div>}
+    {pending.length ? <><div className="decision-inbox-summary"><span><strong>{pending.length}</strong> pending {pending.length === 1 ? 'request' : 'requests'} · {money(pending.reduce((sum, t) => sum + t.amount, 0))} USD</span><span>Priority first, then longest waiting</span></div><TransactionTable records={pending} selectedId={selectedId ?? undefined} onSelect={choose} /><p className="table-footer">All pending requests · USD · Local demo records</p></> : <div className="decision-completion" ref={completionRef} tabIndex={-1}><CheckCircle size={36} aria-hidden="true" /><h2>You’re all caught up</h2><p>No requests are waiting for your decision.</p><Link className="button primary" to="/overview">Back to overview<ArrowRight size={18} /></Link></div>}
+  </main>{selected && <TransactionPanel key={selected.id} transaction={selected} onClose={close} onPrevious={() => choose(pending[index - 1]?.id)} onNext={() => choose(pending[index + 1]?.id)} hasPrevious={index > 0} hasNext={index < pending.length - 1} onDecisionSaved={saved} />}</div>;
+}
+
 export function Gatekeepers() {
   const { state, run, busy } = useDemo(); const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get('search') ?? ''), [status, setStatus] = useState('All'), [editing, setEditing] = useState<Gatekeeper | 'new' | null>(null);
@@ -54,12 +82,22 @@ export function Gatekeepers() {
 
 export function Overview() {
   const { state } = useDemo(), navigate = useNavigate(); const [create, setCreate] = useState(false);
-  const transactions = state!.transactions, approved = transactions.filter(t => t.decision === 'Approved'), pending = transactions.filter(t => t.decision === 'Pending'), blocked = transactions.filter(t => t.decision === 'Blocked');
+  const transactions = state!.transactions, approved = transactions.filter(t => t.decision === 'Approved'), pending = pendingRequests(transactions), blocked = transactions.filter(t => t.decision === 'Blocked');
   const open = (id: string) => navigate(`/transactions?request=${id}`);
-  return <main className="page-main"><PageTitle title="Workspace overview" description="Agent spending, with the full picture." action={<button type="button" className="button primary" onClick={() => setCreate(true)}><Plus size={18} />Create request</button>} />
+  return <main className="page-main"><PageTitle title="Workspace overview" description="Agent spending, with the full picture." action={<button type="button" className="button" onClick={() => setCreate(true)}><Plus size={18} />Create request</button>} />
+    <section className={`decision-summary ${pending.length ? 'needs-attention' : 'caught-up'}`} aria-labelledby="decision-summary-title">
+      {pending.length ? <>
+        <div className="decision-summary-header"><div className="decision-summary-title"><WarningCircle size={28} aria-hidden="true" /><div><h2 id="decision-summary-title">{pending.length} {pending.length === 1 ? 'request needs' : 'requests need'} your decision</h2><p>{money(pending.reduce((sum, t) => sum + t.amount, 0))} awaiting review · USD</p></div></div><button type="button" className="button primary" onClick={() => navigate(`/decisions?request=${pending[0].id}`)}>Review next request<ArrowRight size={18} /></button></div>
+        <div className="decision-preview">{pending.slice(0, 3).map(t => {
+          const merchant = merchants.find(m => m.id === t.merchantId)!, agent = state!.agents.find(a => a.id === t.agentId)!;
+          return <div className="decision-preview-row" key={t.id}><div className="decision-preview-identity"><strong>{merchant.name}</strong><small>{agent.name} · {t.id}</small></div><PriorityBadge value={t.priority} /><span className="decision-wait">Waiting {ago(t.createdAt).replace('Just now', '<1m').replace(' ago', '')}</span><strong className="decision-amount">{money(t.amount)}</strong><button type="button" className="button" aria-label={`Review ${t.id} ${merchant.name}`} onClick={() => navigate(`/decisions?request=${t.id}`)}>Review<CaretRight size={16} /></button></div>;
+        })}</div>
+        <div className="decision-summary-footer"><span>Priority first, then longest waiting</span><TextLink onClick={() => navigate('/decisions')}>View all {pending.length}</TextLink></div>
+      </> : <div className="decision-summary-title"><CheckCircle size={25} aria-hidden="true" /><div><h2 id="decision-summary-title">You’re all caught up</h2><p>No requests are waiting for your decision.</p></div></div>}
+    </section>
     <div className="overview-metrics"><div><span>Approved spend</span><strong>{money(approved.reduce((sum, t) => sum + t.amount, 0))}</strong><small>{approved.length} approved requests · USD</small></div><div><span>Pending review</span><strong>{pending.length}</strong><small>{money(pending.reduce((sum, t) => sum + t.amount, 0))} awaiting a decision</small></div><div><span>Blocked requests</span><strong>{blocked.length}</strong><small>Outside the saved demo policies</small></div><div><span>Active Gatekeepers</span><strong>{state!.agents.filter(a => a.active).length}</strong><small>{state!.agents.length} in this workspace</small></div></div>
     <section className="overview-section"><div className="section-heading"><h2>Recent transactions</h2><TextLink onClick={() => navigate('/transactions')}>View all</TextLink></div><TransactionTable records={transactions.slice(0, 6)} onSelect={open} /></section>
-    <div className="overview-columns"><section><div className="section-heading"><h2>Needs a decision</h2><span className="count">{pending.length}</span></div>{pending.length ? pending.map(t => <button type="button" className="review-row" key={t.id} onClick={() => open(t.id)}><span><strong>{merchants.find(m => m.id === t.merchantId)!.name}</strong><small>{t.id} · {state!.agents.find(a => a.id === t.agentId)!.name}</small></span><strong>{money(t.amount)}</strong><CaretRight size={18} /></button>) : <Empty title="You’re all caught up">There are no pending demo requests.</Empty>}</section><section><div className="section-heading"><h2>Recent activity</h2><TextLink onClick={() => navigate('/audit-log')}>Audit log</TextLink></div>{state!.events.slice(0, 4).map(e => <div className="activity-row" key={e.id}><ClockCounterClockwise size={19} /><div>{e.transactionId ? <button type="button" className="plain-link" onClick={() => open(e.transactionId!)}>{e.title}</button> : <strong>{e.title}</strong>}<small>{e.actor} · {ago(e.createdAt)}</small></div></div>)}</section></div>
+    <section className="overview-section overview-activity"><div className="section-heading"><h2>Recent activity</h2><TextLink onClick={() => navigate('/audit-log')}>Audit log</TextLink></div>{state!.events.slice(0, 4).map(e => <div className="activity-row" key={e.id}><ClockCounterClockwise size={19} /><div>{e.transactionId ? <button type="button" className="plain-link" onClick={() => open(e.transactionId!)}>{e.title}</button> : <strong>{e.title}</strong>}<small>{e.actor} · {ago(e.createdAt)}</small></div></div>)}</section>
     {create && <RequestForm onClose={() => setCreate(false)} onCreated={open} />}
   </main>;
 }

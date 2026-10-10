@@ -53,10 +53,12 @@ The supplied screenshot remains the visual authority. The exact merchant artwork
 
 ## Character animation
 
-Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. Motion style (float, drift, gentle turn, or breathe), duration and phase are deterministically randomized from the agent ID and stay consistent across routes/reloads. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.
+Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. An initial motion style (float, drift, gentle turn, or breathe) is assigned from the agent ID; subsequent turns rotate actions through the shared scheduler. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.
 
 Open `/animation-preview` (or “Try the animated character” on Gatekeepers) and choose any of the ten characters. The preview provides look left/right, blink, wink, eyes closed, pointer-following gaze, and pause/resume at 440px and 112px. Transactions and Overview show 52px animated agent portraits, up from 36px. Gatekeeper cards retain their larger portraits.
 
 Original PNGs remain intact. Generated clean plates repair only the feathered eye regions; provenance and exact prompts are stored beside each plate. Motion pauses offscreen, in hidden tabs and for paused Gatekeepers. Reduced motion allows direct expressions with no ambient spatial motion. Suspension preserves the timeline and current pose.
 
 Validation: `npm run build`, `npm run test`, and `npm run test:browser -- tests/browser/animation.spec.ts`.
+
+Ambient animation is coordinated across the page: one visible portrait plays one finite action, followed by 3–4 seconds of stillness. Each agent has a 3-second cooldown, including duplicate rows, and changes action on its next turn. Idle eye scanning and automatic blink loops are disabled in the UI; preview controls remain available on demand. Offscreen, paused and reduced-motion portraits are excluded.

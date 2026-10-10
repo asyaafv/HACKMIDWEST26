@@ -256,7 +256,7 @@ Selected rows lift to `selected-row`. The detail panel repeats the merchant, amo
 
 ### Artwork
 
-Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (36px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos remain pending supplied files: reserve invisible image dimensions when unavailable. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
+Reuse the ten supplied originals as circular portraits; never regenerate or redraw them. Table portraits default to (52px), Gatekeeper card portraits to (112px), reducing to (94px) on mobile. Keep the raster provenance in `ASSETS.json` and adjacent `.png.origin.json` files. Merchant logos remain pending supplied files: reserve invisible image dimensions when unavailable. The vendor evidence icon shell is transparent when artwork is missing; reserve space without a visible placeholder.
 
 ## Do's and Don'ts
 
@@ -275,3 +275,17 @@ Reuse the ten supplied originals as circular portraits; never regenerate or redr
 - **Don't** fill missing merchant imagery with substitute graphics, monograms, or visible placeholder boxes.
 - **Don't** squeeze the transaction table into illegible columns on mobile; retain horizontal scrolling.
 - **Don't** add redundant decorative eyebrows to form or section headings.
+
+## Authorized character animation
+
+All ten supplied originals remain intact. User-approved generated clean plates reconstruct only feathered eye regions for independent curved eyelids and pupil movement. Character 07 retains its eyeglass frames and bridge. Agents receive stable randomized float, drift, gentle turn (up to 1.2 degrees), or breathe motion with staggered timing; spatial movement scales down with portrait size. Transactions and Overview use 52px portraits. Gatekeeper portraits remain 112px (94px on mobile). Motion stops offscreen, when the document is hidden, when an agent is paused, and under reduced motion. `/animation-preview` lets the user inspect each character.
+
+## Decision-first workspace
+
+Overview is the home screen. Its first section is a full-width decision summary with the pending count, total amount, neutral primary Review next request action, and up to three preview rows. Metrics and historical activity follow. Pending attention uses an amber-tinted surface (`#211e14`), border (`#64512a`), separators (`#4a4029`), and warm supporting text (`#dfd3b8`); these are semantic review colors, not brand accents. The summary heading is 25px (22px on mobile). At zero pending requests, a compact neutral caught-up state replaces the attention section.
+
+Needs a decision sits beneath Overview in navigation, using a compact 14px label to accommodate its count within the existing sidebar. Its amber badge uses the existing pending surface and amber text, and disappears at zero. `/decisions` reuses the transaction workspace, all pending records without a date cutoff, and priority/oldest-first ordering. Saved decisions advance to the next item and announce completion independently of toast preferences. Preview rows stack their identity, priority, waiting duration, amount, and explicit Review action on mobile. Attention cues remain static.
+
+### Quiet animation turns
+
+Ambient animations use a single page-wide lease: one visible portrait at a time, one finite action per turn, and a 3–4 second quiet gap afterward. Each agent has a 3-second cooldown and chooses a different action next time. Duplicate rows share the identity cooldown. No continuous float, gaze or blink loops run in the UI. Deliberate preview controls are independent of ambient turns.

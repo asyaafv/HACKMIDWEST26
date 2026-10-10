@@ -1,7 +1,5 @@
 .animated-avatar { position: relative; display: inline-block; overflow: hidden; background: #08090e; vertical-align: middle; }
-.animated-avatar svg { display: block; width: 100%; height: 100%; transform-origin: center; animation: character-float var(--motion-duration, 8s) ease-in-out infinite; animation-delay: var(--motion-delay, 0s); animation-play-state: paused; }
-.animated-avatar[data-running="true"] svg { animation-play-state: running; }
-@keyframes character-float { 0%, 100% { transform: translateY(3px) rotate(-.5deg) scale(.975); } 50% { transform: translateY(-3px) rotate(.5deg) scale(.975); } }
+.animated-avatar svg { display: block; width: 100%; height: 100%; transform-origin: center; transform: scale(.975); animation: none; animation-play-state: paused; }
 .motion-preview .page-heading h1 { font-size: clamp(30px, 3vw, 40px); }
 .motion-workbench { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); border-top: 1px solid var(--border); margin-top: 30px; }
 .motion-stage { min-width: 0; min-height: 540px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 32px 20px; }
@@ -22,11 +20,5 @@
 
 .animation-preview-link { margin: -8px 0 20px; }
 
-.animated-avatar[data-motion="drift"] svg { animation-name: character-drift; }
-.animated-avatar[data-motion="turn"] svg { animation-name: character-turn; }
-.animated-avatar[data-motion="breathe"] svg { animation-name: character-breathe; }
-@keyframes character-drift { 0%, 100% { transform: translate(-1px, 1px) rotate(-.3deg) scale(.975); } 50% { transform: translate(1px, -1px) rotate(.3deg) scale(.975); } }
-@keyframes character-turn { 0%, 100% { transform: rotate(-1.2deg) scale(.975); } 50% { transform: rotate(1.2deg) scale(.975); } }
-@keyframes character-breathe { 0%, 100% { transform: scale(.97); } 50% { transform: scale(.985); } }
 .character-select { display: flex; align-items: center; gap: 12px; margin-top: 18px; color: var(--secondary); font-size: 13px; }
 .character-select select { flex: 1; min-width: 0; background: var(--field-bg, #0b151d); color: var(--text); border: 1px solid var(--border); padding: 9px 12px; border-radius: 7px; }

@@ -33,9 +33,9 @@
     "policy": "No substitute graphics or visible placeholders. Render supplied asset only when its path exists in the merchant data."
   },
   "animationPrototype": {
-    "file": "public/assets/characters/character_01-clean-plate.png",
-    "origin": "Built-in imagegen edit of supplied character_01.png; prompt in adjacent .origin.json",
-    "treatment": "Feathered eye-region reconstruction only. Original body, beanie and background from supplied PNG.",
-    "scope": "User-authorized one-character prototype"
+    "files": "public/assets/characters/character_01-clean-plate.png through character_10-clean-plate.png",
+    "origin": "Built-in imagegen edits of supplied characters; exact prompts in adjacent .origin.json files",
+    "treatment": "Feathered eye-region reconstruction only. Original body, accessories and background remain supplied PNG pixels. Character 07 preserves eyeglass frames.",
+    "scope": "User-authorized animation on all agents"
   }
 }

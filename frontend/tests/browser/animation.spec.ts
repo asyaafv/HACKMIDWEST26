@@ -129,3 +129,32 @@ test('every character has a clean plate, stable personality and larger table por
   await page.getByRole('button', { name: 'Close eyes', exact: true }).click();
   await expect(page.locator('.motion-stage .rig-outline').last()).toHaveAttribute('data-openness', '0');
 });
+
+test('dashboard agents take separate turns with quiet gaps instead of continuous loops', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/gatekeepers');
+  await expect(page.locator('.gatekeeper-card .animated-avatar')).toHaveCount(10);
+  await page.clock.pauseAt(new Date(Date.now() + 100));
+  let wasActive = false, lastEnded: number | null = null, turns = 0;
+  for (let elapsed = 0; elapsed < 25000; elapsed += 200) {
+    await page.clock.fastForward(200);
+    const active = await page.locator('.animated-avatar[data-ambient-active="true"]').count();
+    expect(active).toBeLessThanOrEqual(1);
+    if (active && !wasActive) {
+      turns++;
+      if (lastEnded !== null) {
+        expect(elapsed - lastEnded).toBeGreaterThanOrEqual(2800);
+        expect(elapsed - lastEnded).toBeLessThanOrEqual(4200);
+      }
+    }
+    if (!active && wasActive) lastEnded = elapsed;
+    wasActive = active > 0;
+  }
+  expect(turns).toBeGreaterThanOrEqual(2);
+  // Navigating during a live lease must release the old portrait safely.
+  for (let i = 0; i < 8 && !(await page.locator('.animated-avatar[data-ambient-active="true"]').count()); i++) await page.clock.fastForward(2000);
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/overview');
+  await expect(page.getByRole('heading', { name: 'Workspace overview' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
