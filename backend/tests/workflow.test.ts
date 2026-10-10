@@ -239,7 +239,8 @@ describe("Gate sandbox workflow", () => {
       const key = randomUUID();
       const first = await client.callTool({ name: "gate_request_spend", arguments: { ...proposal, idempotency_key: key } });
       const second = await client.callTool({ name: "gate_request_spend", arguments: { ...proposal, idempotency_key: key } });
-      expect(first.isError).not.toBe(true); expect(first.structuredContent).toEqual(second.structuredContent);
+      expect(first.isError).not.toBe(true); expect((first.structuredContent as any).data).toEqual((second.structuredContent as any).data);
+      expect((first.structuredContent as any).trace_id).not.toBe((second.structuredContent as any).trace_id);
     } finally { await client.close(); await app.close(); }
   });
   it("import verifies original IDs, hashes, links and path boundaries", async () => {

@@ -15,6 +15,8 @@ export interface PolicyInput {
   dailyUsedMinor: string;
   dailyCount: number;
   evidenceComplete: boolean;
+  duplicateIntent?: boolean;
+  contradictoryEvidence?: boolean;
 }
 export function evaluate(input: PolicyInput) {
   const amount = BigInt(input.proposal.amountMinor);
@@ -41,6 +43,14 @@ export function evaluate(input: PolicyInput) {
     reviews.push({ code: "REQUIRED_EVIDENCE_MISSING", resolution: "NEW_EVIDENCE" });
     factors.push({ code: "EVIDENCE", points: 30 });
   }
+  if (input.duplicateIntent) {
+    reviews.push({ code: "DUPLICATE_BUSINESS_INTENT", resolution: "HUMAN_JUDGMENT" });
+    factors.push({ code: "DUPLICATE_INTENT", points: 20 });
+  }
+  if (input.contradictoryEvidence) {
+    reviews.push({ code: "CONTRADICTORY_REQUIRED_EVIDENCE", resolution: "NEW_EVIDENCE" });
+    factors.push({ code: "CONTRADICTION", points: 35 });
+  }
   const riskScore = Math.min(100, factors.reduce((sum, factor) => sum + factor.points, 0));
   if (riskScore >= POLICY.reviewScoreThreshold && !reviews.some(r => r.resolution === "NEW_EVIDENCE")) {
     reviews.push({ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
@@ -49,7 +59,7 @@ export function evaluate(input: PolicyInput) {
   return {
     verdict: denied ? "REJECT" as const : reviews.length ? "REVIEW" as const : "APPROVE" as const,
     riskScore, factors, rules, reviewRequirements: reviews,
-    executionAllowed: !denied && input.evidenceComplete,
+    executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence,
     requiresHumanConsent: true as const, policyVersion: POLICY.version,
     policyHash: hash(POLICY), inputHash: hash(input),
   };

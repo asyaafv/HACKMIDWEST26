@@ -1,0 +1,23 @@
+{
+  "records": [
+    {
+      "id": "GATE-ISSUE-909",
+      "kind": "issue",
+      "title": "Restricted project incident",
+      "ticketId": "GATE-TICKET-909",
+      "observedAt": "2026-10-09T12:00:00Z"
+    },
+    {
+      "id": "GATE-TICKET-909",
+      "kind": "ticket",
+      "title": "Restricted support case",
+      "accountId": "GATE-ACCOUNT-909"
+    },
+    {
+      "id": "GATE-ACCOUNT-909",
+      "kind": "account",
+      "name": "Private Demo Account",
+      "title": "Private Demo Account"
+    }
+  ]
+}

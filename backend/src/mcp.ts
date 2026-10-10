@@ -1,38 +1,47 @@
 /** Stateless Gate MCP transport delegates to REST's services; chat never supplies finance identity. */
 import type { FastifyInstance } from "fastify";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { DB } from "./db.js";
 import type { GateService } from "./service.js";
 import { authenticate } from "./auth.js";
-import { proposalSchema, idSchema, keySchema } from "./contracts.js";
+import { toolSchemas, toolOutputSchema, SERVER_VERSION } from "./mcp-schemas.js";
+import { capabilityAccess, TOOL_CAPABILITIES } from "./capabilities.js";
+import { listRequests, sourceContext, paymentDetail } from "./mcp-context.js";
 import { GateError, requireThat } from "./errors.js";
 
-export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[]) {
+export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = []) {
   app.route({ method: ["GET", "POST", "DELETE"], url: "/mcp", handler: async (req, reply) => {
     requireThat(allowedHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "MCP host not allowed.", 403);
+    if (req.headers.origin) requireThat(allowedOrigins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "MCP origin not allowed.", 403);
     const principal = await authenticate(db, req.headers.authorization);
     if (req.method !== "POST") return reply.code(405).header("Allow", "POST").send({ error: "Stateless MCP accepts POST only." });
-    const server = new McpServer({ name: "Gate", version: "0.1.0" });
+    const server = new McpServer({ name: "Gate", version: SERVER_VERSION });
     const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
-    const result = async (work: () => Promise<unknown>) => {
+    const result = async (name: string, work: () => Promise<unknown>) => {
       try {
+        capabilityAccess(principal, TOOL_CAPABILITIES[name]!);
         const data = await work();
-        const text = JSON.stringify({ data, mode: "sandbox", provider: "simulator" });
+        const envelope = { data, mode: "sandbox" as const, provider: "simulator" as const, trace_id: req.id, server_version: SERVER_VERSION, dataset_version: null };
+        const text = JSON.stringify(envelope);
         requireThat(Buffer.byteLength(text) <= 32768, "OUTPUT_LIMIT", "Output too large; inspect the request through the scoped API.");
-        return { content: [{ type: "text" as const, text }], structuredContent: { data, mode: "sandbox", provider: "simulator" } };
+        return { content: [{ type: "text" as const, text }], structuredContent: envelope };
       } catch (error) {
         const code = error instanceof GateError ? error.code : error instanceof ZodError ? "INVALID_INPUT" : "DEPENDENCY_FAILURE";
         return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code, message: error instanceof GateError ? error.message : "Tool could not complete." } }) }] };
       }
     };
-    server.registerTool("gate_capabilities", { description: "Read authenticated role, sandbox mode, and available workflow boundaries.", inputSchema: z.object({}).strict(), annotations: read }, () => result(async () => ({ role: principal.role, financeConsent: "authenticated REST only", liveDevrevConnection: false, evidence: "approved server import required" })));
-    server.registerTool("gate_search_context", { description: "Search allowed imported source IDs/content; results are bounded, not exhaustive.", inputSchema: z.object({ query: z.string().min(2).max(200) }).strict(), annotations: read }, ({ query }) => result(async () => ({ items: await service.search(principal, query), limit: 50, exhaustive: false })));
-    server.registerTool("gate_preview_spend", { description: "Read-only proposed spending evaluation. Does not reserve or pay.", inputSchema: proposalSchema, annotations: read }, input => result(() => service.previewProposal(principal, input)));
-    server.registerTool("gate_request_spend", { description: "Record an explicitly reviewed sandbox proposal; requires idempotency_key. Payment needs separate finance consent.", inputSchema: proposalSchema.extend({ idempotency_key: keySchema }), annotations: { ...read, readOnlyHint: false } }, ({ idempotency_key, ...proposal }) => result(() => service.create(principal, proposal, idempotency_key)));
-    server.registerTool("gate_get_request", { description: "Recover an existing request's decision, evidence and payment state.", inputSchema: z.object({ request_id: idSchema }).strict(), annotations: read }, ({ request_id }) => result(() => service.get(principal, request_id)));
-    server.registerTool("gate_explain_request", { description: "Explain source evidence, policy, consent and sandbox receipt with audit references.", inputSchema: z.object({ request_id: idSchema }).strict(), annotations: read }, ({ request_id }) => result(() => service.explain(principal, request_id)));
+    server.registerTool("gate_capabilities", { description: "Read authenticated role, sandbox mode, and available workflow boundaries.", inputSchema: toolSchemas.gate_capabilities, outputSchema: toolOutputSchema, annotations: read }, () => result("gate_capabilities", async () => ({ role: principal.role, capabilities: principal.capabilities, usableTools: Object.keys(TOOL_CAPABILITIES).filter(tool => principal.capabilities?.includes(TOOL_CAPABILITIES[tool]!)), serverVersion: SERVER_VERSION, datasetVersion: null, financeConsent: "authenticated REST only", liveDevrevConnection: false, evidence: "approved server import required" })));
+    server.registerTool("gate_search_context", { description: "Search allowed imported source IDs/content; results are bounded, not exhaustive.", inputSchema: toolSchemas.gate_search_context, outputSchema: toolOutputSchema, annotations: read }, ({ query }) => result("gate_search_context", async () => ({ items: await service.search(principal, query), limit: 50, exhaustive: false })));
+    server.registerTool("gate_preview_spend", { description: "Read-only proposed spending evaluation. Does not reserve or pay.", inputSchema: toolSchemas.gate_preview_spend, outputSchema: toolOutputSchema, annotations: read }, input => result("gate_preview_spend", () => service.previewProposal(principal, input)));
+    server.registerTool("gate_request_spend", { description: "Record an explicitly reviewed sandbox proposal; requires idempotency_key. Payment needs separate finance consent.", inputSchema: toolSchemas.gate_request_spend, outputSchema: toolOutputSchema, annotations: { ...read, readOnlyHint: false } }, ({ idempotency_key, ...proposal }) => result("gate_request_spend", () => service.create(principal, proposal, idempotency_key)));
+    server.registerTool("gate_get_request", { description: "Recover an existing request's decision, evidence and payment state.", inputSchema: toolSchemas.gate_get_request, outputSchema: toolOutputSchema, annotations: read }, ({ request_id }) => result("gate_get_request", () => service.get(principal, request_id)));
+    server.registerTool("gate_explain_request", { description: "Explain source evidence, policy, consent and sandbox receipt with audit references.", inputSchema: toolSchemas.gate_explain_request, outputSchema: toolOutputSchema, annotations: read }, ({ request_id }) => result("gate_explain_request", () => service.explain(principal, request_id)));
+    server.registerTool("gate_catalog", { description: "Discover assigned agents/projects, configured merchants and sandbox limits.", inputSchema: toolSchemas.gate_catalog, outputSchema: toolOutputSchema, annotations: read }, () => result("gate_catalog", () => service.catalog(principal)));
+    server.registerTool("gate_get_context", { description: "Retrieve an exact authorized source with verified context and citations.", inputSchema: toolSchemas.gate_get_context, outputSchema: toolOutputSchema, annotations: read }, ({ source_domain, source_id }) => result("gate_get_context", () => sourceContext(db, principal, source_domain, source_id)));
+    server.registerTool("gate_list_requests", { description: "Recover scoped requests with bounded cursor pagination.", inputSchema: toolSchemas.gate_list_requests, outputSchema: toolOutputSchema, annotations: read }, input => result("gate_list_requests", () => listRequests(db, principal, input)));
+    server.registerTool("gate_get_payment", { description: "Read an existing scoped sandbox payment; supply exactly one ID.", inputSchema: toolSchemas.gate_get_payment, outputSchema: toolOutputSchema, annotations: read }, input => result("gate_get_payment", () => paymentDetail(db, service, principal, input)));
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     reply.hijack();

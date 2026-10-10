@@ -1,0 +1,15 @@
+/** Frontend schemas are emitted from the shared runtime Zod contracts. */
+import { writeFile } from 'node:fs/promises';
+import { apiSchemas } from '../src/contracts.js';
+const envelope = (name: string) => ({ type: 'object', required: ['data','meta'], properties: { data: { $ref: `#/components/schemas/${name}` }, meta: { type: 'object', properties: { traceId: { type: 'string' }, mode: { const: 'sandbox' }, provider: { const: 'simulator' } } } } });
+const operation = (name: string, response: string, input?: string) => ({ operationId: name, security: [{ bearerAuth: [] }, { browserSession: [] }], ...(input ? { requestBody: { required: true, content: { 'application/json': { schema: { $ref: `#/components/schemas/${input}` } } } } } : {}), responses: { '200': { description: 'Successful response; immutable action keys required on writes', content: { 'application/json': { schema: envelope(response) } } }, '401': { description: 'Credential required' }, '403': { description: 'Capability denied' }, '409': { description: 'Stale version, conflicting key or state' } } });
+const paths = {
+ '/payments/{id}': { parameters:[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}], get: operation('getPayment','Payment') },
+ '/me': { get: operation('me','Principal') },
+ '/requests': { post: { ...operation('createRequest','Request','Proposal'), parameters: [{ in:'header', name:'Idempotency-Key', required:true, schema:{type:'string',minLength:8,maxLength:128} }], responses: { '201': { description:'New request or replay', content:{'application/json':{schema:envelope('Request')}} } } } },
+ '/requests/{id}': { parameters:[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}], get:operation('getRequest','Request') },
+ '/requests/{id}/preview': { parameters:[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}], post:{...operation('financePreview','Preview'),parameters:[{in:'header',name:'Idempotency-Key',required:true,schema:{type:'string'}}]} },
+ '/requests/{id}/consent': { parameters:[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}], post:{...operation('financeConsent','ConsentResult','Consent'),parameters:[{in:'header',name:'Idempotency-Key',required:true,schema:{type:'string'}}]} },
+};
+await writeFile('docs/schemas.json', JSON.stringify({ contractVersion:'1.0.0', schemas:apiSchemas },null,2)+'\n');
+await writeFile('docs/openapi.json', JSON.stringify({ openapi:'3.1.0', info:{title:'Gate v1 core financial contracts',version:'1.0.0',description:'Core typed contracts. Additional read/recovery/auth endpoints are documented in api.md; this document does not invent their response schemas.'}, servers:[{url:'/v1'}], paths, components:{schemas:{...apiSchemas,ConsentResult:{type:'object',required:['requestId','workflowStatus','mode'],properties:{requestId:{type:'string',format:'uuid'},workflowStatus:{enum:['AUTHORIZED','REJECTED']},paymentId:{type:'string',format:'uuid'},mode:{const:'sandbox'}}}},securitySchemes:{bearerAuth:{type:'http',scheme:'bearer'},browserSession:{type:'apiKey',in:'cookie',name:'__Host-gate_session'}}} },null,2)+'\n');

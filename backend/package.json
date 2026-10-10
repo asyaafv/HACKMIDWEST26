@@ -17,7 +17,18 @@
     "db:local": "tsx scripts/local-postgres.ts",
     "demo:seed": "node --env-file-if-exists=.env --import tsx scripts/seed.ts",
     "data:import": "node --env-file-if-exists=.env --import tsx scripts/import.ts",
-    "audit:verify": "node --env-file-if-exists=.env --import tsx scripts/verify-audit.ts"
+    "audit:verify": "node --env-file-if-exists=.env --import tsx scripts/verify-audit.ts",
+    "demo:prepare": "node --env-file-if-exists=.env --import tsx scripts/seed.ts --prepare",
+    "contracts:export": "node --import tsx scripts/export-contracts.ts",
+    "test:e2e": "vitest run tests/console.e2e.test.ts",
+    "gatekeeper:provision": "node --env-file-if-exists=.env --import tsx scripts/provision-gatekeeper.ts",
+    "gatekeeper:scenario": "node --env-file-if-exists=.env --import tsx scripts/gatekeeper-scenario.ts",
+    "gatekeeper:manifest": "node --import tsx scripts/gatekeeper-manifest.ts",
+    "ledger:verify": "node --env-file-if-exists=.env --import tsx scripts/verify-ledger.ts",
+    "payment:recover": "node --env-file-if-exists=.env --import tsx scripts/recover-payment.ts",
+    "test:integration": "vitest run tests/workflow.test.ts tests/payments-recovery.test.ts tests/auth-gatekeepers.test.ts",
+    "test:concurrency": "vitest run tests/workflow.test.ts -t \"serializes|executors|oversubscribe\"",
+    "test:mcp": "vitest run tests/workflow.test.ts tests/auth-gatekeepers.test.ts -t \"MCP|SDK|tool|scoped|investigator\""
   },
   "dependencies": {
     "@fastify/rate-limit": "10.3.0",
@@ -27,6 +38,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "22.20.5",
     "@types/pg": "8.23.1",
     "embedded-postgres": "18.4.0-beta.17",
