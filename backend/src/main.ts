@@ -1,0 +1,12 @@
+/** API process entry point; restricted DB role and graceful shutdown bound its lifecycle. */
+import { Pool } from "./db.js";
+import { configuration } from "./config.js";
+import { createApp } from "./app.js";
+
+const config = configuration();
+const db = new Pool({ connectionString: config.DATABASE_URL, options: "-c role=gate_runtime", max: 10 });
+const app = createApp(db, { logger: true, origins: config.ALLOWED_ORIGINS.split(",").filter(Boolean), mcpHosts: config.MCP_ALLOWED_HOSTS.split(",").filter(Boolean) });
+const stop = async () => { await app.close(); await db.end(); };
+process.once("SIGINT", stop);
+process.once("SIGTERM", stop);
+await app.listen({ host: config.HOST, port: config.PORT });

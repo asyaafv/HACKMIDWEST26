@@ -1,3 +1,4 @@
+"""Checks the archived advisory policy; no verified evidence or payments are exercised."""
 import unittest
 
 from policy import policy_preview, evidence_checklist
