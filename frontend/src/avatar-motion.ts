@@ -1,7 +1,7 @@
 export type Expression = 'idle' | 'left' | 'right' | 'blink' | 'wink' | 'closed';
 type Point = { x: number; y: number };
 type Transition = { from: Point; to: Point; start: number; duration: number };
-type Gesture = { kind: 'blink' | 'wink' | 'closed' | 'open'; start: number; from: number[] };
+type Gesture = { kind: 'blink' | 'wink' | 'closed' | 'open' | 'rest-eyes'; start: number; from: number[] };
 const ease = (v: number) => 1 - (1 - Math.max(0, Math.min(1, v))) ** 3;
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const CENTER = { x: 0, y: 0 };
@@ -41,7 +41,17 @@ export class AvatarMotion {
     this.mode = 'idle'; this.eyes = [1, 1]; this.gaze = { ...CENTER }; this.sway = { ...CENTER };
     this.transition = null; this.gesture = null; this.ambientReturnAt = null; this.tracking = false;
   }
-  playAmbient(action: 'glance' | 'blink' | 'wink') {
+  playAmbient(action: 'glance' | 'left' | 'right' | 'blink' | 'wink' | 'rest-eyes') {
+    if (action === 'rest-eyes') {
+      this.mode = 'idle'; this.ambientReturnAt = null;
+      this.gesture = { kind: 'rest-eyes', start: this.time, from: [...this.eyes] };
+      return;
+    }
+    if (action === 'left' || action === 'right') {
+      this.command(action, false);
+      this.ambientReturnAt = this.time + 2000;
+      return;
+    }
     if (action !== 'glance') { this.command(action, false); return; }
     this.mode = 'idle';
     this.move({ x: (this.random() < .5 ? -1 : 1) * (36 + this.random() * 6), y: (this.random() * 2 - 1) * 16 }, 500);
@@ -76,7 +86,8 @@ export class AvatarMotion {
     let gestureFinished = false;
     if (g) {
       const age = t - g.start;
-      const wink = g.kind === 'wink', closing = wink ? 120 : 90, holding = wink ? 220 : 60, opening = wink ? 200 : 160;
+      const wink = g.kind === 'wink', resting = g.kind === 'rest-eyes';
+      const closing = resting ? 140 : wink ? 120 : 90, holding = resting ? 1000 : wink ? 220 : 60, opening = resting ? 260 : wink ? 200 : 160;
       if (g.kind === 'open') {
         const progress = ease(age / 160);
         this.eyes = g.from.map(o => mix(o, 1, progress));
@@ -93,7 +104,7 @@ export class AvatarMotion {
       if (gestureFinished) { this.eyes = [1, 1]; this.gesture = null; }
     }
     if (this.ambientReturnAt !== null && t >= this.ambientReturnAt) { this.move(CENTER, 600); this.ambientReturnAt = null; }
-    const freezeGaze = this.gesture?.kind === 'blink' || this.gesture?.kind === 'wink';
+    const freezeGaze = this.gesture?.kind === 'blink' || this.gesture?.kind === 'wink' || this.gesture?.kind === 'rest-eyes';
     if (freezeGaze) {
       // Shift gaze deadlines so a gesture cannot consume the glance/hold duration.
       if (this.transition) this.transition.start += dt;

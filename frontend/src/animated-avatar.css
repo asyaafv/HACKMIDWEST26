@@ -1,5 +1,15 @@
 .animated-avatar { position: relative; display: inline-block; overflow: hidden; background: #08090e; vertical-align: middle; }
 .animated-avatar svg { display: block; width: 100%; height: 100%; transform-origin: center; transform: scale(.975); animation: none; animation-play-state: paused; }
+.animated-avatar[data-selected="true"] { animation: selected-avatar-float 3.6s linear infinite; animation-play-state: paused; will-change: transform; }
+.animated-avatar[data-selected="true"][data-running="true"] { animation-play-state: running; }
+@keyframes selected-avatar-float {
+  /* Sine-like quarters: slow only at the peaks, pass through center without stopping. */
+  0%, 50% { transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(.333, .524, .667, 1); }
+  25% { transform: translate3d(0, calc(-1 * var(--float-distance)), 0); animation-timing-function: cubic-bezier(.333, 0, .667, .476); }
+  75% { transform: translate3d(0, var(--float-distance), 0); animation-timing-function: cubic-bezier(.333, 0, .667, .476); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+.motion-float { margin-top: 20px; width: 100%; justify-content: center; }
 .motion-preview .page-heading h1 { font-size: clamp(30px, 3vw, 40px); }
 .motion-workbench { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); border-top: 1px solid var(--border); margin-top: 30px; }
 .motion-stage { min-width: 0; min-height: 540px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 32px 20px; }
@@ -16,7 +26,7 @@
 .motion-context small { color: var(--secondary); margin-top: 6px; font-size: 13px; }
 .motion-controls .motion-accessibility { font-size: 13px; color: var(--muted); margin-top: 24px; }
 @media (max-width: 1050px) { .motion-workbench { grid-template-columns: minmax(0, 1fr); }.motion-stage { min-height: 0; }.motion-controls { min-width: 0; border-left: 0; border-top: 1px solid var(--border); padding: 28px 0; }.motion-controls > p { max-width: 55ch; } }
-@media (prefers-reduced-motion: reduce) { .animated-avatar svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .animated-avatar[data-selected="true"], .animated-avatar svg { animation: none; } }
 
 .animation-preview-link { margin: -8px 0 20px; }
 

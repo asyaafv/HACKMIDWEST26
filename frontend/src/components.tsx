@@ -4,8 +4,8 @@ import { useDemo } from './context';
 import type { Decision, Gatekeeper, Merchant, Priority } from './types';
 import { AnimatedAvatar } from './AnimatedAvatar';
 
-export function Avatar({ agent, size = 52 }: { agent: Gatekeeper; size?: number }) {
-  return <AnimatedAvatar key={`${agent.id}-${agent.avatar}`} character={agent.avatar} identity={agent.id} size={size} label={`${agent.name} character portrait`} paused={!agent.active} />;
+export function Avatar({ agent, size = 72, selected = false }: { agent: Gatekeeper; size?: number; selected?: boolean }) {
+  return <AnimatedAvatar key={`${agent.id}-${agent.avatar}`} character={agent.avatar} identity={agent.id} size={size} selected={selected} label={`${agent.name} character portrait`} paused={!agent.active} />;
 }
 export function MerchantImage({ merchant, size = 36 }: { merchant: Merchant; size?: number }) {
   return merchant.logo ? <img className={`merchant-image merchant-image-${merchant.id}`} src={merchant.logo} alt="" width={size} height={size} /> : <span className="merchant-space" style={{ width: size, height: size }} aria-hidden="true" />;

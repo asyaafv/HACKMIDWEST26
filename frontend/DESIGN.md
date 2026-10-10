@@ -278,7 +278,7 @@ Reuse the ten supplied originals as circular portraits; never regenerate or redr
 
 ## Authorized character animation
 
-All ten supplied originals remain intact. User-approved generated clean plates reconstruct only feathered eye regions for independent curved eyelids and pupil movement. Character 07 retains its eyeglass frames and bridge. Agents receive stable randomized float, drift, gentle turn (up to 1.2 degrees), or breathe motion with staggered timing; spatial movement scales down with portrait size. Transactions and Overview use 52px portraits. Gatekeeper portraits remain 112px (94px on mobile). Motion stops offscreen, when the document is hidden, when an agent is paused, and under reduced motion. `/animation-preview` lets the user inspect each character.
+All ten supplied originals remain intact. User-approved generated clean plates reconstruct only feathered eye regions for independent curved eyelids and pupil movement. Character 07 retains its eyeglass frames and bridge. Agents receive stable randomized drift, turn, breathe and eye actions with staggered timing; spatial movement scales down with portrait size. Selected transaction portraits add a stronger float independently of their ambient actions. Transactions and Overview use 52px portraits. Gatekeeper portraits remain 112px (94px on mobile). Motion stops offscreen, when the document is hidden, when an agent is paused, and under reduced motion. `/animation-preview` lets the user inspect each character.
 
 ## Decision-first workspace
 
@@ -288,4 +288,4 @@ Needs a decision sits beneath Overview in navigation, using a compact 14px label
 
 ### Quiet animation turns
 
-Ambient animations use a single page-wide lease: one visible portrait at a time, one finite action per turn, and a 3–4 second quiet gap afterward. Each agent has a 3-second cooldown and chooses a different action next time. Duplicate rows share the identity cooldown. No continuous float, gaze or blink loops run in the UI. Deliberate preview controls are independent of ambient turns.
+Ambient animation runs independently for each visible agent, with staggered first turns within one second and 3–4 seconds of rest between actions. Duplicate rows share an identity cooldown. Actions rotate through drift, tilt, breathe, nod, lean, look around, look left, look right, blink, wink and a relaxed both-eyes-closed pose. Floating is reserved for selected transaction portraits and the explicit Float toggle in the preview; it uses a separate 3.6-second sine-like bob with 4–18px travel per direction, scaled to portrait size. Eye and other ambient actions continue independently while floating. Deselection removes the bob immediately; pause, offscreen, hidden-tab and reduced-motion states stop it. The relaxed pose closes over 140 ms, holds for one second, and reopens over 260 ms. Offscreen, paused and reduced-motion portraits stay still; preview controls remain available.

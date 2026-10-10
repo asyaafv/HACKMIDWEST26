@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Pause, Play } from '@phosphor-icons/react';
 import './animated-avatar.css';
@@ -7,6 +7,7 @@ import { avatarProfile, characterRig, seededRandom } from './avatar-profiles';
 import { avatarDirector } from './avatar-director';
 import { AvatarMotion, eyePath, type Expression } from './avatar-motion';
 export type { Expression } from './avatar-motion';
+const MOTION_AMPLITUDE = 1.5;
 const expressions: { value: Expression; label: string }[] = [
   { value: 'idle', label: 'Look around' }, { value: 'left', label: 'Look left' },
   { value: 'right', label: 'Look right' }, { value: 'blink', label: 'Blink' },
@@ -14,8 +15,8 @@ const expressions: { value: Expression; label: string }[] = [
 ];
 
 /** Character 01 rig. Coordinates match the supplied 1254px original. */
-export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = false, expression = 'idle', cue = 0, interactive = false, character = 1, identity = 'preview-red' }: {
-  size?: number; label?: string; paused?: boolean; expression?: Expression; cue?: number; interactive?: boolean; character?: number; identity?: string;
+export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = false, selected = false, expression = 'idle', cue = 0, interactive = false, character = 1, identity = 'preview-red' }: {
+  size?: number; label?: string; paused?: boolean; selected?: boolean; expression?: Expression; cue?: number; interactive?: boolean; character?: number; identity?: string;
 }) {
   const id = useId().replace(/:/g, '');
   const rig = characterRig(character);
@@ -67,8 +68,9 @@ export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = fals
       const pose = `${state.gaze.x.toFixed(3)},${state.gaze.y.toFixed(3)},${state.sway.x.toFixed(3)},${state.sway.y.toFixed(3)},${state.eyes}`;
       if (pose === lastPose) return;
       lastPose = pose;
-      pupils.forEach(p => p.setAttribute('transform', `translate(${state.gaze.x.toFixed(3)} ${state.gaze.y.toFixed(3)})`));
-      pair.setAttribute('transform', character === 7 ? 'translate(0 0)' : `translate(${state.sway.x.toFixed(3)} ${state.sway.y.toFixed(3)})`);
+      // Move the complete white eye and pupil together instead of sliding inside the ring.
+      pupils.forEach(p => p.setAttribute('transform', character === 7 ? `translate(${(state.gaze.x * MOTION_AMPLITUDE).toFixed(3)} ${(state.gaze.y * MOTION_AMPLITUDE).toFixed(3)})` : 'translate(0 0)'));
+      pair.setAttribute('transform', character === 7 ? 'translate(0 0)' : `translate(${((state.gaze.x + state.sway.x) * MOTION_AMPLITUDE).toFixed(3)} ${((state.gaze.y + state.sway.y) * MOTION_AMPLITUDE).toFixed(3)})`);
       apertures.forEach((path, i) => path.setAttribute('d', lens(rig.centers[i], state.eyes[i])));
       outlines.forEach((path, i) => {
         path.setAttribute('d', lens(rig.centers[i], state.eyes[i]));
@@ -84,14 +86,15 @@ export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = fals
       start: (action, duration) => {
         root.current!.dataset.ambientActive = 'true';
         root.current!.dataset.action = action;
-        if (action === 'glance' || action === 'blink' || action === 'wink') state.playAmbient(action);
+        if (action === 'glance' || action === 'left' || action === 'right' || action === 'blink' || action === 'wink' || action === 'rest-eyes') state.playAmbient(action);
         else {
-          const distance = Math.min(4, size * .03), drift = Math.min(3, size * .024);
+          const distance = Math.min(4, size * .03) * MOTION_AMPLITUDE, drift = Math.min(3, size * .024) * MOTION_AMPLITUDE;
           const neutral = 'scale(.975)';
-          const poses = action === 'float' ? [neutral, `translateY(${-distance}px) scale(.975)`, `translateY(${distance}px) scale(.975)`, neutral]
-            : action === 'drift' ? [neutral, `translate(${drift}px, ${-drift}px) scale(.975)`, `translate(${-drift}px, ${drift}px) scale(.975)`, neutral]
-            : action === 'turn' ? [neutral, 'rotate(-3deg) scale(.975)', 'rotate(3deg) scale(.975)', neutral]
-            : [neutral, 'scale(.995)', neutral];
+          const poses = action === 'drift' ? [neutral, `translate(${drift}px, ${-drift}px) scale(.975)`, `translate(${-drift}px, ${drift}px) scale(.975)`, neutral]
+            : action === 'turn' ? [neutral, 'rotate(-4.5deg) scale(.975)', 'rotate(4.5deg) scale(.975)', neutral]
+            : action === 'nod' ? [neutral, `translateY(${distance}px) scale(.975, .9525)`, neutral]
+            : action === 'lean' ? [neutral, `translateX(${drift}px) rotate(3deg) scale(.975)`, neutral]
+            : [neutral, 'scale(1.005)', neutral];
           bodyAnimation.current = node.animate(poses.map(transform => ({ transform, easing: 'ease-in-out' })), { duration, easing: 'linear', iterations: 1 });
         }
       },
@@ -111,8 +114,8 @@ export function AnimatedAvatar({ size = 112, label = 'Gatekeeper', paused = fals
     };
     frame = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(frame); unregister(); };
-  }, [suspended, reduced, character, plateReady, expression]);
-  return <span ref={root} className="animated-avatar avatar" data-running={running} data-ambient-active="false" data-action="rest" data-character={character} data-motion={profile.style} style={{ width: size, height: size }}
+  }, [suspended, reduced, character, plateReady, expression, identity, id, size]);
+  return <span ref={root} className="animated-avatar avatar" data-running={running} data-selected={selected} data-ambient-active="false" data-action="rest" data-character={character} data-motion={profile.style} style={{ width: size, height: size, '--float-distance': `${Math.min(18, Math.max(4, size * .06)) * MOTION_AMPLITUDE}px` } as CSSProperties}
     onPointerMove={interactive ? e => { const r = e.currentTarget.getBoundingClientRect(); avatarDirector.setEnabled(id, false); pointer.current = { x: ((e.clientX - r.left) / r.width - .5) * 84, y: ((e.clientY - r.top) / r.height - .5) * 32 }; } : undefined}
     onPointerLeave={() => { pointer.current = null; avatarDirector.setEnabled(id, running && plateReady && expression === 'idle'); }}>
     <svg ref={svg} viewBox="0 0 1254 1254" role="img" aria-label={label}>
@@ -138,14 +141,16 @@ export function AnimationPreview() {
   const [expression, setExpression] = useState<Expression>('idle');
   const [cue, setCue] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [floating, setFloating] = useState(false);
   return <main className="page-main motion-preview">
     <div className="page-heading"><div><h1>A little more alive.</h1><p>One Gatekeeper. A first look at its personality.</p></div><Link className="button" to="/gatekeepers">Back to Gatekeepers</Link></div>
     <div className="motion-workbench">
-      <div className="motion-stage"><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={440} paused={paused} expression={expression} cue={cue} interactive label={`Character ${character} animation preview`} /><span className="motion-stage-note">Move your pointer to catch its eye.</span></div>
-      <section className="motion-controls" aria-label="Animation controls"><h2>Meet your Gatekeeper</h2><label className="character-select">Character<select aria-label="Character" value={character} onChange={e => { setCharacter(Number(e.target.value)); setExpression('idle'); }}>{Array.from({length: 10}, (_, i) => <option key={i} value={i + 1}>Character {i + 1}</option>)}</select></label><p>A soft float, an occasional blink, and a curious glance. Try an expression to see how it feels.</p>
+      <div className="motion-stage"><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={440} paused={paused} selected={floating} expression={expression} cue={cue} interactive label={`Character ${character} animation preview`} /><span className="motion-stage-note">Move your pointer to catch its eye.</span></div>
+      <section className="motion-controls" aria-label="Animation controls"><h2>Meet your Gatekeeper</h2><label className="character-select">Character<select aria-label="Character" value={character} onChange={e => { setCharacter(Number(e.target.value)); setExpression('idle'); }}>{Array.from({length: 10}, (_, i) => <option key={i} value={i + 1}>Character {i + 1}</option>)}</select></label><p>Blinks, relaxed eyes, and curious glances happen naturally. Select Float to add a more noticeable bob.</p>
+        <button type="button" className={`button motion-float ${floating ? 'primary' : ''}`} aria-pressed={floating} onClick={() => setFloating(value => !value)}>Float</button>
         <div className="expression-controls">{expressions.map(e => <button type="button" className={`button ${expression === e.value ? 'primary' : ''}`} key={e.value} aria-pressed={expression === e.value} onClick={() => { setExpression(e.value); setCue(c => c + 1); }}>{e.label}</button>)}</div>
         <button type="button" className="button motion-pause" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? 'Resume animation' : 'Pause animation'}</button>
-        <div className="motion-context"><h3>At dashboard size</h3><div><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={112} paused={paused} expression={expression} cue={cue} /><span><strong>Character {character}</strong><small>Same character, same motion.</small></span></div></div>
+        <div className="motion-context"><h3>At dashboard size</h3><div><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={112} paused={paused} selected={floating} expression={expression} cue={cue} /><span><strong>Character {character}</strong><small>Same character, same motion.</small></span></div></div>
         <p className="motion-accessibility">Motion follows your device’s reduced-motion preference.</p>
       </section>
     </div>

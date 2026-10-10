@@ -6,6 +6,17 @@ function advance(rig: AvatarMotion, ms: number, reduced = false) {
 }
 
 describe('Gatekeeper motion', () => {
+  it('relaxed eye closure closes both eyes, holds for one second and fully reopens', () => {
+    const rig = new AvatarMotion(() => .5);
+    rig.playAmbient('rest-eyes');
+    rig.step(70, null, false, false);
+    expect(rig.eyes[0]).toBeGreaterThan(0);
+    expect(rig.eyes[0]).toBeLessThan(1);
+    rig.step(70, null, false, false); expect(rig.eyes).toEqual([0, 0]);
+    rig.step(1000, null, false, false); expect(rig.eyes).toEqual([0, 0]);
+    rig.step(130, null, false, false); expect(rig.eyes[0]).toBeGreaterThan(0);
+    rig.step(130, null, false, false); expect(rig.eyes).toEqual([1, 1]);
+  });
   it('blink reaches exact closure, holds it, and fully reopens at 310 ms', () => {
     const rig = new AvatarMotion(() => .5);
     rig.command('blink', false);
