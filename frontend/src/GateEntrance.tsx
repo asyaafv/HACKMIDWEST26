@@ -40,7 +40,7 @@ export function GateEntrance({ children }: { children: ReactNode }) {
     const initStarted = performance.now();
     document.documentElement.style.overflow = 'hidden';
     shell.inert = true;
-    shell.style.filter = 'grayscale(1) brightness(.3) blur(3px)';
+    shell.style.filter = 'brightness(.3)';
     button.focus({ preventScroll: true });
 
     const release = () => {
@@ -81,7 +81,7 @@ export function GateEntrance({ children }: { children: ReactNode }) {
       approval.current!.style.opacity = String(pose.approval);
       approval.current!.style.transform = `translateY(${(1 - pose.approval) * 8}px)`;
       root.style.setProperty('--intro-backdrop', String(1 - pose.handoff));
-      shell.style.filter = `grayscale(${1 - pose.handoff}) brightness(${.3 + .7 * pose.handoff}) blur(${3 * (1 - pose.handoff)}px)`;
+      shell.style.filter = `brightness(${.3 + .7 * pose.handoff})`;
       try { scene.render(elapsed, pose); } catch { staticReveal('fallback'); return; }
       frame = requestAnimationFrame(paint);
     };

@@ -40,7 +40,7 @@ export function RequestForm({ onClose, onCreated }: { onClose: () => void; onCre
   <p>Project: {state!.catalog?.projects.find(p=>p.id===project)?.name??'Select an assigned Gatekeeper'}</p>
   <label className="field">Business purpose<textarea aria-label="Business purpose" value={purpose} onChange={e=>setPurpose(e.target.value)} required maxLength={1000}/></label>
   <label className="field">Find supporting evidence<input aria-label="Find supporting evidence" value={query} onChange={e=>setQuery(e.target.value)} maxLength={200}/></label><button className="button" type="button" disabled={busy||query.length<2} onClick={()=>{void api.call<{items:typeof sources}>(`/sources/search?q=${encodeURIComponent(query)}`).then(r=>setSources(r.items)).catch(e=>setError(e.message));}}>Search sources</button>
-  <label className="field">Supporting source<select aria-label="Supporting source" value={sourceId} onChange={e=>setSource(e.target.value)} required><option value="">Select source</option>{sources.map(s=><option key={`${s.domain}:${s.source_id}`} value={`${s.domain}:${s.source_id}`}>{s.domain} · {s.source_id}</option>)}</select></label>
+  <label className="field">Supporting source<select aria-label="Supporting source" value={sourceId} onChange={e=>setSource(e.target.value)} required><option value="">Select source</option>{sources.map(s=><option key={`${s.domain}:${s.source_id}`} value={`${s.domain}:${s.source_id}`}>{s.domain}, {s.source_id}</option>)}</select></label>
   {error&&<ErrorMessage>{error}</ErrorMessage>}<p>No payment is created or executed.</p><FormFooter busy={busy||!active.length} onClose={onClose}>Check and submit</FormFooter>
  </form></Dialog>;
 }

@@ -32,11 +32,11 @@ export function createEntranceScene(canvas: HTMLCanvasElement): EntranceScene {
     geometries.add(geometry);
     const object = new THREE.Mesh(geometry, mat); object.position.set(x, y, z); parent.add(object); return object;
   };
-  const stone = (color: number) => material(new THREE.MeshStandardMaterial({ color, roughness: .89, metalness: .08, flatShading: true, transparent: true }));
-  const stones = [stone(0x58666b), stone(0x68777a), stone(0x788184), stone(0x4a585f), stone(0x84908f)];
-  const iron = material(new THREE.MeshStandardMaterial({ color: 0x263c3b, metalness: .82, roughness: .3, transparent: true }));
-  const edge = material(new THREE.MeshStandardMaterial({ color: 0x9ba393, metalness: .68, roughness: .42, transparent: true }));
-  const darkStone = stone(0x253235);
+  const stone = (color: number) => material(new THREE.MeshStandardMaterial({ color, roughness: 1, metalness: 0, flatShading: true, transparent: true }));
+  const stones = [stone(0x606060), stone(0x707070), stone(0x7c7c7c), stone(0x535353), stone(0x898989)];
+  const iron = material(new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0, roughness: 1, transparent: true }));
+  const edge = material(new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0, roughness: 1, transparent: true }));
+  const darkStone = stone(0x2c2c2c);
   const fadeGroup = (group: THREE.Object3D, opacity: number) => {
     group.traverse(object => {
       if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
@@ -53,10 +53,9 @@ export function createEntranceScene(canvas: HTMLCanvasElement): EntranceScene {
   };
 
   try {
-    scene.add(new THREE.HemisphereLight(0xd9e9f5, 0x182b29, 1.9));
-    const key = new THREE.DirectionalLight(0xffecd2, 3); key.position.set(-4, 7, 6); scene.add(key);
-    const rim = new THREE.DirectionalLight(0x7bdbcd, 3); rim.position.set(5, 4, -2); scene.add(rim);
-    const codeLight = new THREE.PointLight(0x33ff9a, 10, 8, 2); codeLight.position.set(-2.5, 2, 2); scene.add(codeLight);
+    scene.add(new THREE.HemisphereLight(0xe5e5e5, 0x242424, 1.9));
+    const key = new THREE.DirectionalLight(0xffffff, 3); key.position.set(-4, 7, 6); scene.add(key);
+
 
     // Individually beveled blocks and radial voussoirs make the arch tangible at close range.
     const block = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z = 0) => {
@@ -197,29 +196,8 @@ export function createEntranceScene(canvas: HTMLCanvasElement): EntranceScene {
           eyeCtx.strokeText(digit, x, y); eyeCtx.fillText(digit, x, y);
         }
       }
-      eyeCtx.shadowBlur = 0; eyeTexture.needsUpdate = true;
+      eyeTexture.needsUpdate = true;
     };
-
-    const glowCanvas = document.createElement('canvas'); glowCanvas.width = glowCanvas.height = 128;
-    const glowCtx = glowCanvas.getContext('2d')!, gradient = glowCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gradient.addColorStop(0, 'rgba(104,242,183,.22)'); gradient.addColorStop(.4, 'rgba(52,153,127,.09)'); gradient.addColorStop(1, 'rgba(0,0,0,0)');
-    glowCtx.fillStyle = gradient; glowCtx.fillRect(0, 0, 128, 128);
-    const glowMap = texture(new THREE.CanvasTexture(glowCanvas));
-    const hazeMat = material(new THREE.MeshBasicMaterial({ map: glowMap, transparent: true, opacity: .75, depthWrite: false }));
-    const haze = mesh(new THREE.PlaneGeometry(8.7, 2.5), hazeMat, scenery, 0, .03, 2); haze.rotation.x = -Math.PI / 2;
-    const moteGeometry = new THREE.BufferGeometry(), moteCount = 54;
-    const positions = new Float32Array(moteCount * 3);
-    moteGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3)); geometries.add(moteGeometry);
-    const moteMat = material(new THREE.PointsMaterial({ color: 0x65ffc0, size: .034, transparent: true, opacity: .6, depthWrite: false }));
-    const motes = new THREE.Points(moteGeometry, moteMat); scenery.add(motes);
-    const trailMaterial = material(new THREE.MeshBasicMaterial({ color: 0x8bffca, transparent: true, opacity: 0, depthWrite: false }));
-    const trail = new THREE.Group(); scene.add(trail);
-    const sparks = Array.from({ length: 14 }, (_, i) => {
-      const spark = mesh(new THREE.BoxGeometry(.018, .018, .18 + (i % 3) * .1), trailMaterial, trail);
-      const angle = i * 2.39996;
-      spark.position.set(Math.cos(angle) * (1.3 + i * .025), 1.9 + Math.sin(angle) * 1.1, -.5 - (i % 4) * .16);
-      return spark;
-    });
 
     const resize = () => {
       width = window.innerWidth; height = window.innerHeight;
@@ -265,17 +243,6 @@ export function createEntranceScene(canvas: HTMLCanvasElement): EntranceScene {
       });
       reflectionMaterial.uniforms.opacity.value = pose.code * .62 * pose.mascotOpacity;
       reflectionMaterial.uniforms.gaze.value = pose.gaze;
-      codeLight.intensity = pose.code * 10; codeLight.position.x = pose.gaze * 2.5;
-      for (let i = 0; i < moteCount; i++) {
-        const side = i % 2 ? 1 : -1;
-        positions[i * 3] = side * (2.7 + (i % 7) * .17) + Math.sin(time / 950 + i * 4) * .13;
-        positions[i * 3 + 1] = ((i * .37 + time / 2400) % 4.5) + .3;
-        positions[i * 3 + 2] = Math.sin(i * 7) * 1.6;
-      }
-      moteGeometry.attributes.position.needsUpdate = true;
-      moteMat.opacity = pose.code * pose.scenery * .55;
-      trailMaterial.opacity = Math.sin(pose.flight * Math.PI) * .55 * pose.scenery;
-      sparks.forEach((spark, i) => { spark.position.z = -.5 + pose.flight * (3.1 - (i % 4) * .24); });
       renderer.render(scene, camera);
     };
     resize(); render(0, entrancePose(0));
