@@ -72,7 +72,7 @@ export class Investigations {
    await tx.query("UPDATE investigations SET status='EVIDENCE_RECEIVED',version=version+1,evidence_received_at=now() WHERE org_id=$1 AND request_id=$2",[p.orgId,id]);
    await appendAudit(tx,p.orgId,p.id,'investigation.evidence_received',id,{runId:inv.run_id,sources:body.report.sources,unresolvedQuestions:body.report.unresolvedQuestions});
    const decision=await this.service.evaluateInvestigation(tx,p,row,evidence),version=row.version+1;
-   const status=decision.verdict==='REJECT'?'REJECTED':evidence.complete?'AWAITING_CONSENT':'AWAITING_EVIDENCE';
+   const status=decision.verdict==='REJECT'?'REJECTED':evidence.complete&&!decision.reviewRequirements.some(r=>r.resolution==='NEW_EVIDENCE')?'AWAITING_CONSENT':'AWAITING_EVIDENCE';
    await tx.query('UPDATE requests SET evidence=$3,decision=$4,status=$5,version=$6 WHERE org_id=$1 AND id=$2',[p.orgId,id,evidence,decision,status,version]);
    await tx.query('INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
     [randomUUID(),p.orgId,id,version,row.proposal,hash(row.proposal),evidence,hash(evidence),decision,hash(decision)]);

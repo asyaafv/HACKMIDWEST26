@@ -28,7 +28,9 @@
     "payment:recover": "node --env-file-if-exists=.env --import tsx scripts/recover-payment.ts",
     "test:integration": "vitest run tests/workflow.test.ts tests/payments-recovery.test.ts tests/auth-gatekeepers.test.ts",
     "test:concurrency": "vitest run tests/workflow.test.ts -t \"serializes|executors|oversubscribe\"",
-    "test:mcp": "vitest run tests/workflow.test.ts tests/auth-gatekeepers.test.ts -t \"MCP|SDK|tool|scoped|investigator\""
+    "test:mcp": "vitest run tests/workflow.test.ts tests/auth-gatekeepers.test.ts -t \"MCP|SDK|tool|scoped|investigator\"",
+    "devrev:prepare": "node --import tsx scripts/devrev-trust-setup.ts prepare",
+    "devrev:register-webhook": "node --env-file-if-exists=.env --import tsx scripts/devrev-trust-setup.ts register"
   },
   "dependencies": {
     "@fastify/rate-limit": "10.3.0",

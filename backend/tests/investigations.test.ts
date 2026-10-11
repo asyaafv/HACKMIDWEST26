@@ -53,23 +53,22 @@ it('queues a proposal, denies premature review, and completes a real scoped MCP 
 });
 it('returns a low-risk backend decision through MCP and validates it without changing the request',async()=>{
  const request=await service.create(buyer,{...proposal(),amountMinor:'12001',purpose:'Low risk MCP decision acceptance'},randomUUID());
- const started=await client.callTool({name:'gate_start_investigation',arguments:{request_id:request.id,expectedVersion:1,idempotency_key:randomUUID()}});
- const inv=(started.structuredContent as any).data;
- const submitted=await client.callTool({name:'gate_submit_evidence',arguments:{request_id:request.id,expectedVersion:1,runId:inv.run_id,report:await reportFor(request.id),idempotency_key:randomUUID()}});
- expect(submitted.isError).not.toBe(true);
- expect((submitted.structuredContent as any).data.decision).toMatchObject({verdict:'APPROVE',riskScore:0,riskAssessment:{level:'LOW',lowRisk:true,computedBy:'BACKEND_POLICY'}});
+ // Complete low-risk evidence authorizes immediately under policy v3 and later.
+ expect(request).toMatchObject({workflowStatus:'AUTHORIZED',decision:{verdict:'APPROVE',riskScore:0,riskAssessment:{level:'LOW',lowRisk:true,computedBy:'BACKEND_POLICY'}}});
+ const blocked=await client.callTool({name:'gate_start_investigation',arguments:{request_id:request.id,expectedVersion:1,idempotency_key:randomUUID()}});
+ expect(blocked.isError).toBe(true); // Evidence investigations cannot rewrite a financial authorization.
  const validated=await client.callTool({name:'gate_get_request',arguments:{request_id:request.id,validate_decision:true}});
  expect(validated.isError).not.toBe(true);
- expect((validated.structuredContent as any).data.validation).toMatchObject({status:'VALID',requestVersion:2,decision:{verdict:'APPROVE',riskScore:0},paymentExecution:false});
+ expect((validated.structuredContent as any).data.validation).toMatchObject({requestVersion:1,decision:{verdict:'APPROVE',riskScore:0},paymentExecution:false});
  const before=await service.get(finance,request.id);
- await admin.query('UPDATE budgets SET limit_minor=1 WHERE org_id=$1',[controls.orgId]);
+ await admin.query('UPDATE budgets SET limit_minor=reserved_minor+spent_minor WHERE org_id=$1',[controls.orgId]);
  try {
   const validation=await service.validateDecision(finance,request.id);
   expect(validation).toMatchObject({status:'CHANGED',decision:{verdict:'REJECT',riskAssessment:{lowRisk:false,level:'BLOCKED'}}});
   expect(validation.reasons).toContain('POLICY_FINDINGS_CHANGED');
   expect(await service.get(finance,request.id)).toEqual(before);
  } finally {await admin.query('UPDATE budgets SET limit_minor=1000000 WHERE org_id=$1',[controls.orgId]);}
- for(const table of ['payments','jobs','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
+ for(const table of ['payments','jobs','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('1');
 });
 it('serializes competing claims, retains same-key replay, and fences expired runs',async()=>{
  const request=await create(),key=randomUUID();
