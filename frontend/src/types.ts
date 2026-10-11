@@ -12,7 +12,7 @@ export interface Transaction {
   canApprove?:boolean;investigation?:Investigation|null;unresolvedQuestions?:string[];previousReview?:{choice:string;reason:string};
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
-  simulated?: boolean;
+  simulated?: boolean; category?: 'diagnostics'|'incident_response'; source?: {domain:'pm'|'crm'|'document';sourceId:string}; reviewRequirements?: {code:string;resolution:string}[];
   reviewBinding?: {version:number;snapshotHash:string};
   workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; backend?: unknown; historicalPayment?: unknown; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
 }

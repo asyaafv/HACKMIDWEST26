@@ -7,17 +7,20 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { DB } from "./db.js";
 import type { GateService } from "./service.js";
 import { authenticate } from "./auth.js";
+import { authenticateDevRevMcp, type DevRevMcpIdentity } from "./devrev-auth.js";
 import { toolSchemas, toolOutputSchema, SERVER_VERSION } from "./mcp-schemas.js";
 import { capabilityAccess, TOOL_CAPABILITIES } from "./capabilities.js";
 import { listRequests, sourceContext } from "./mcp-context.js";
 import { GateError, requireThat } from "./errors.js";
 
-export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = []) {
+export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = [], devrevIdentity?: DevRevMcpIdentity) {
   const investigations = new Investigations(db,service);
   app.route({ method: ["GET", "POST", "DELETE"], url: "/mcp", handler: async (req, reply) => {
     requireThat(allowedHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "MCP host not allowed.", 403);
     if (req.headers.origin) requireThat(allowedOrigins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "MCP origin not allowed.", 403);
-    const principal = await authenticate(db, req.headers.authorization);
+    const principal = devrevIdentity && req.headers.authorization?.startsWith("Bearer ") && !/^Bearer [a-f0-9]{64}$/.test(req.headers.authorization)
+      ? await authenticateDevRevMcp(db, req.headers.authorization, devrevIdentity)
+      : await authenticate(db, req.headers.authorization);
     if (req.method !== "POST") return reply.code(405).header("Allow", "POST").send({ error: "Stateless MCP accepts POST only." });
     const server = new McpServer({ name: "Gate", version: SERVER_VERSION });
     const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
@@ -34,7 +37,6 @@ export function attachMcp(app: FastifyInstance, db: DB, service: GateService, al
         return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code, message: error instanceof GateError ? error.message : "Tool could not complete." } }) }] };
       }
     };
-
     server.registerTool('gate_list_investigations',{description:'List waiting, failed or expired investigations in granted projects.',inputSchema:toolSchemas.gate_list_investigations,outputSchema:toolOutputSchema,annotations:read},({limit})=>result('gate_list_investigations',()=>investigations.list(principal,limit)));
     server.registerTool('gate_start_investigation',{description:'Claim a proposal for ten minutes; returns the runId fencing token. No financial execution.',inputSchema:toolSchemas.gate_start_investigation,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_start_investigation',()=>investigations.start(principal,request_id,body,idempotency_key)));
     server.registerTool('gate_submit_evidence',{description:'Submit imported source hashes, verified links and unresolved questions; Gate reevaluates and archives a new revision.',inputSchema:toolSchemas.gate_submit_evidence,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_submit_evidence',()=>investigations.submit(principal,request_id,body,idempotency_key)));

@@ -20,8 +20,9 @@ import { GateService } from "./service.js";
 import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
+import type { DevRevMcpIdentity } from "./devrev-auth.js";
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace } = {}) {
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db);
@@ -61,6 +62,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       return {data:{...await service.dashboard(p),identity:{id:p.id,orgId:p.orgId,role:p.role,capabilities:p.capabilities,actorMode:'shared_hackathon_demo'}},meta:{traceId:req.id}};
     });
     demo.get('/sources/search', async req => ({data:{items:await service.search(await demoPrincipal(db,options.demoWorkspace!),String((req.query as any).q ?? ''))},meta:{traceId:req.id}}));
+    demo.post('/purchases/preview', async req => ({data:await service.previewProposal(await demoPrincipal(db,options.demoWorkspace!),req.body),meta:{traceId:req.id}}));
     demo.post('/purchases', async (req,reply) => {
       const result = await simulatePurchase(db,service,await demoPrincipal(db,options.demoWorkspace!),req.body,keySchema.parse(req.headers['idempotency-key']));
       reply.code(201);return {data:result,meta:{traceId:req.id}};
@@ -126,6 +128,6 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/requests/:id/explanation", async req => wrap(await service.explain(await principal(req), id(req)), req.id));
     api.get("/sources/search", async req => wrap({ items: await service.search(await principal(req), String((req.query as any).q ?? "")), exhaustive: false }, req.id));
   }, { prefix: "/v1" });
-  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins);
+  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity);
   return app;
 }
