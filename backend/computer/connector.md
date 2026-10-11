@@ -8,7 +8,7 @@ The team supplied `https://hackmidwest26.onrender.com` as the intended public
 base URL. The candidate Gate endpoint is `https://hackmidwest26.onrender.com/mcp`.
 The Render service now runs the authenticated TypeScript Gate backend. The
 DevRev connection must refresh discovery after deployment to pick up the
-seven-tool contract. The hosted PostgreSQL database already contains the
+eleven-tool investigation contract. The hosted PostgreSQL database already contains the
 18-record `SYNTHETIC_DEMO_DATA` seed; no second import is needed. DevRev
 registration remains unverified.
 
@@ -45,10 +45,10 @@ authenticated `/mcp` endpoint directly.
 1. Deploy the API and private PostgreSQL. Apply migrations using the admin/migration identity, including the current transaction-review migration; run the API with the restricted runtime role. Do not reset the hosted database as a connector test. A worker is needed only if payment execution is deliberately enabled later.
 2. Terminate HTTPS at an approved public hostname. Configure an exact Host allowlist including actual forwarded host/port behavior. The proxy must preserve Authorization, Accept, Content-Type, MCP protocol headers and JSON bodies, and must not redirect `/mcp` to a login page. Configure `trustProxy` only for known proxy addresses with Chat 4; never trust arbitrary forwarded Host/IP headers. Restrict private backend ingress to that proxy.
 3. Configure exact allowed browser Origins (scheme, hostname, port), no wildcard. Pass these as attachMcp's fifth argument. Browser sessions use a host-only `__Host-gate_session` cookie: Secure, HttpOnly, SameSite=Strict. Use HTTPS for the browser origin. Cross-site UI hosting requires a separately reviewed cookie/CORS design; this default is same-site. MCP never authenticates from cookies.
-4. Provision one Gate AGENT identity/project/credential per submitting Gatekeeper using the commands below. A read-only investigator omits request:submit. TTL is 1–168 hours; default 24. Store the returned secret only in the approved connection secret store. It is a Gate credential, independent of DevRev/provider/finance credentials.
+4. Provision one Gate AGENT identity/project/credential per submitting Gatekeeper using the commands below. An investigator omits request:submit and receives investigation:write for scoped proposal investigation. Existing credentials require deliberate reprovisioning for this new scope. TTL is 1–168 hours; default 24. Store the returned secret only in the approved connection secret store. It is a Gate credential, independent of DevRev/provider/finance credentials.
 5. Do not put secrets in URLs, source control, skills, screenshots or logs. Redact Authorization, Cookie, Set-Cookie, passwords and CSRF headers/bodies. Provisioning private output files use exclusive creation and mode 0600; keep them outside Git. Keep DB credentials in the host secret store. Rotate/revoke after the event and test next-call denial.
-6. Verify externally reachable authenticated SDK initialization/discovery and the seven versioned tools. Missing, expired and revoked tokens fail before tool disclosure. Validate wrong Host/Origin, source/request scope denial, and output errors. Tool output includes trace_id/server_version; dataset_version is null at the envelope until a single active version is configured, with actual source versions/hashes retained in evidence.
-7. Update the existing DevRev skill and connector bindings to the seven names in `capability-manifest.json`; refresh cached connector discovery. `gate_request_spend` needs explicit permission to record. This never grants finance review or payment consent.
+6. Verify externally reachable authenticated SDK initialization/discovery and the eleven versioned tools. Missing, expired and revoked tokens fail before tool disclosure. Validate wrong Host/Origin, source/request scope denial, and output errors. Tool output includes trace_id/server_version; dataset_version is null at the envelope until a single active version is configured, with actual source versions/hashes retained in evidence.
+7. Update the existing DevRev skill and connector bindings to the eleven names in `capability-manifest.json`; refresh cached connector discovery. `gate_request_spend` needs explicit permission to record. This never grants finance review or payment consent.
 8. Record actual DevRev traces for context → advisory preview → permission to record → idempotent proposal → independent Gate dashboard review → cited request state. Include another authorized user's distinct credential/source, denied source, missing tool, negative trigger and timeout recovery. A shared connection is one Gate service identity; a chat name does not establish human identity.
 
 ## Local provisioning and SDK commands
@@ -74,3 +74,5 @@ Use `httpAuthenticate` plus `enforceHttpCapability` on REST routes. Cookie mutat
 ## Proof still required
 
 Actual public URL and TLS/proxy/Host configuration; secure per-user connection support; verified platform setup labels; supplied team custom skill and version/hash; observed installation/triggers/discovery/calls; second authorized remote user and different source. Do not infer these from local SDK success or connector registration.
+
+For claim/evidence/failure schemas, leases and reevaluation, see ../docs/gatekeeper-investigations.md. Refresh actual connector discovery to 0.4.0; local acceptance is not remote installation proof.

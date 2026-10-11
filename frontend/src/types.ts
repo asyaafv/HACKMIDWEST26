@@ -2,12 +2,14 @@
 export type Decision = 'Approved' | 'Pending' | 'Blocked';
 export type Priority = 'P0' | 'P1' | 'P2';
 export type PolicyKind = 'vendors' | 'budget' | 'limit' | 'purpose' | 'categories' | 'risk';
-export interface Gatekeeper { id: string; name: string; description: string; department: string; avatar: number; active: boolean; createdAt: string; projectId?: string; ownerId?: string }
+export interface Gatekeeper { id: string; name: string; description: string; department: string; avatar: number; active: boolean; createdAt: string; projectId?: string; ownerId?: string;canPurchase?:boolean }
 export interface Merchant { id: string; name: string; category: string; domain: string; logo?: string }
 export interface Policy { id: PolicyKind; name: string; description: string; enabled: boolean; value: number | string; version: number }
 export interface PolicyCheck { id: PolicyKind; name: string; detail: string; passed: boolean; version: number }
 export interface Evidence { id: string; title: string; subtitle: string; kind: 'vendor' | 'request' | 'project' | 'budget' | 'purpose'; text: string; sourceId?: string; domain?: string; sourceHash?: string }
+export interface Investigation {status:'WAITING'|'INVESTIGATING'|'EVIDENCE_RECEIVED'|'EVALUATED'|'FAILED';mode:null|'LOCAL_TEST'|'GATEKEEPER';run_id:string|null;started_at:string|null;evidence_received_at:string|null;evaluated_at:string|null;lease_until:string|null;failure_reason:string|null}
 export interface Transaction {
+  canApprove?:boolean;investigation?:Investigation|null;unresolvedQuestions?:string[];previousReview?:{choice:string;reason:string};
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
   simulated?: boolean;
