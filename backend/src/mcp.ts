@@ -13,9 +13,9 @@ import { capabilityAccess, TOOL_CAPABILITIES } from "./capabilities.js";
 import { listRequests, sourceContext } from "./mcp-context.js";
 import { GateError, requireThat } from "./errors.js";
 
-export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = [], devrevIdentity?: DevRevMcpIdentity) {
+export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = [], devrevIdentity?: DevRevMcpIdentity, transportOptions: {path?:string;readOnly?:boolean} = {}) {
   const investigations = new Investigations(db,service);
-  app.route({ method: ["GET", "POST", "DELETE"], url: "/mcp", handler: async (req, reply) => {
+  app.route({ method: ["GET", "POST", "DELETE"], url: transportOptions.path??"/mcp", handler: async (req, reply) => {
     requireThat(allowedHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "MCP host not allowed.", 403);
     if (req.headers.origin) requireThat(allowedOrigins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "MCP origin not allowed.", 403);
     const principal = devrevIdentity && req.headers.authorization?.startsWith("Bearer ") && !/^Bearer [a-f0-9]{64}$/.test(req.headers.authorization)
@@ -26,9 +26,11 @@ export function attachMcp(app: FastifyInstance, db: DB, service: GateService, al
     const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
     const result = async (name: string, work: () => Promise<unknown>) => {
       try {
+        requireThat(!transportOptions.readOnly || name==='gate_get_request','FORBIDDEN','This MCP connection permits GateGetRequest only.',403);
         capabilityAccess(principal, TOOL_CAPABILITIES[name]!);
         const data = await work();
-        const envelope = { data, mode: "sandbox" as const, provider: "simulator" as const, trace_id: req.id, server_version: SERVER_VERSION, dataset_version: null };
+        const envelope = { data, mode: "sandbox" as const, provider: "simulator" as const, trace_id: req.id, server_version: SERVER_VERSION, dataset_version: null,
+          ...(transportOptions.readOnly?{access_mode:'orchestration_read_only'}:{}) };
         const text = JSON.stringify(envelope);
         requireThat(Buffer.byteLength(text) <= 32768, "OUTPUT_LIMIT", "Output too large; inspect the request through the scoped API.");
         return { content: [{ type: "text" as const, text }], structuredContent: envelope };
@@ -37,6 +39,7 @@ export function attachMcp(app: FastifyInstance, db: DB, service: GateService, al
         return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code, message: error instanceof GateError ? error.message : "Tool could not complete." } }) }] };
       }
     };
+    if (!transportOptions.readOnly) {
     server.registerTool('gate_list_investigations',{description:'List waiting, failed or expired investigations in granted projects.',inputSchema:toolSchemas.gate_list_investigations,outputSchema:toolOutputSchema,annotations:read},({limit})=>result('gate_list_investigations',()=>investigations.list(principal,limit)));
     server.registerTool('gate_start_investigation',{description:'Claim a proposal for ten minutes; returns the runId fencing token. No financial execution.',inputSchema:toolSchemas.gate_start_investigation,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_start_investigation',()=>investigations.start(principal,request_id,body,idempotency_key)));
     server.registerTool('gate_submit_evidence',{description:'Submit imported source hashes, verified links and unresolved questions; Gate reevaluates and archives a new revision. Return the backend decision.verdict and decision.riskAssessment.summary to the user, including APPROVE for low risk. The score is rule points, not a probability; finance consent is separate.',inputSchema:toolSchemas.gate_submit_evidence,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_submit_evidence',()=>investigations.submit(principal,request_id,body,idempotency_key)));
@@ -47,6 +50,7 @@ export function attachMcp(app: FastifyInstance, db: DB, service: GateService, al
     server.registerTool("gate_preview_spend", { description: "Read-only backend risk evaluation. Return decision.verdict, riskScore and riskAssessment.summary even for LOW risk / APPROVE. Rules and risk scores come from Gate; never invent a probability. Finance consent is separate.", inputSchema: toolSchemas.gate_preview_spend, outputSchema: toolOutputSchema, annotations: read }, input => result("gate_preview_spend", () => service.previewProposal(principal, input)));
     server.registerTool("gate_request_spend", { description: "Record an explicitly reviewed sandbox proposal; requires idempotency_key. Payment needs separate finance consent.", inputSchema: toolSchemas.gate_request_spend, outputSchema: toolOutputSchema, annotations: { ...read, readOnlyHint: false } }, ({ idempotency_key, ...proposal }) => result("gate_request_spend", () => service.create(principal, proposal, idempotency_key)));
     server.registerTool("gate_list_requests", { description: "Recover scoped requests with bounded cursor pagination.", inputSchema: toolSchemas.gate_list_requests, outputSchema: toolOutputSchema, annotations: read }, input => result("gate_list_requests", () => listRequests(db, principal, input)));
+    }
     server.registerTool("gate_get_request", { description: "Return a stored request's evidence, backend policy decision and review. Set validate_decision=true to rerun current backend checks and return validation.decision, including an explicit low-risk APPROVE recommendation. Validation is read-only; report CHANGED when the saved decision is stale.", inputSchema: toolSchemas.gate_get_request, outputSchema: toolOutputSchema, annotations: read }, ({ request_id, validate_decision }) => result("gate_get_request", async () => {
       const request = await service.get(principal, request_id);
       if (!validate_decision) return request;

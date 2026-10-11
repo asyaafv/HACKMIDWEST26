@@ -19,19 +19,40 @@ import { httpAuthenticate } from "./sessions.js";
 import { enforceHttpCapability } from "./capabilities.js";
 import { proposalSchema } from "./contracts.js";
 import { randomUUID } from "node:crypto";
-import { ZodError } from "zod";
+import { ZodError,z } from "zod";
 import type { DB } from "./db.js";
 import { GateService } from "./service.js";
 import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
 import type { DevRevMcpIdentity } from "./devrev-auth.js";
+import { OrchestrationCoordinator } from './orchestration.js';
+import type { OrchestrationSettings } from './orchestration-contracts.js';
+import { authenticatedWebhook,verificationChallenge } from './devrev-async.mjs';
+const ZodOrchestrationStart=z.object({requestId:z.string().uuid()}).strict();
+const ZodOrchestrationRecovery=z.object({acknowledgeReadOnlyReplay:z.literal(true)}).strict();
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean } = {}) {
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean; orchestration?:OrchestrationSettings; orchestrationPolling?:boolean } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds});
   const investigations = new Investigations(db,service);
+  const coordinator=options.orchestration?new OrchestrationCoordinator(db,service,options.orchestration):undefined;
+  if(coordinator&&options.orchestrationPolling&&options.orchestration?.enabled) {
+    let stopped=false,timer:ReturnType<typeof setTimeout>|undefined,inFlight:Promise<unknown>|undefined;
+    const poll=()=>{inFlight=coordinator.runOnce().catch(()=>app.log.warn({code:'ORCHESTRATION_DEPENDENCY_UNAVAILABLE'},'Orchestration worker unavailable.'))
+      .finally(()=>{if(!stopped){timer=setTimeout(poll,1000);timer.unref();}});};
+    app.addHook('onReady',async()=>{timer=setTimeout(poll,0);timer.unref();});
+    app.addHook('onClose',async()=>{stopped=true;clearTimeout(timer);await inFlight;});
+  }
+  if(coordinator&&options.orchestration?.webhookSecret) {
+    app.post('/v1/integrations/devrev/orchestration/webhook',{bodyLimit:262144},async req=>{
+      requireThat(authenticatedWebhook(req.headers['x-api-key'],options.orchestration!.webhookSecret),'UNAUTHENTICATED','Valid webhook authentication required.',401);
+      const challenge=verificationChallenge(req.body);
+      if(challenge!==undefined)return {challenge};
+      return coordinator.receive(req.body);
+    });
+  }
   app.register(rateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: req => req.ip });
   const origins = options.origins ?? [];
   app.addHook("onRequest", async (req, reply) => {
@@ -134,6 +155,17 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     const key = (req: any) => keySchema.parse(req.headers["idempotency-key"]);
     const id = (req: any) => idSchema.parse(req.params.id);
     const wrap = (data: unknown, traceId: string) => ({ data, meta: { traceId, mode: "sandbox", provider: "simulator" } });
+    if(coordinator) {
+      api.post('/orchestrations',async(req,reply)=>{
+        const body=ZodOrchestrationStart.parse(req.body);
+        const data=await coordinator.start(await principal(req),body.requestId,key(req));reply.code(202);return wrap(data,req.id);
+      });
+      api.get('/orchestrations/:id',async req=>wrap(await coordinator.get(await principal(req),id(req)),req.id));
+      api.post('/orchestrations/:id/recover',async(req,reply)=>{
+        ZodOrchestrationRecovery.parse(req.body);
+        const data=await coordinator.recover(await principal(req),id(req),key(req));reply.code(202);return wrap(data,req.id);
+      });
+    }
     registerPaymentRoutes(api, { service, principal, development: !!options.developmentFaults });
     api.get("/me", async req => { const p = await principal(req); return wrap({ id: p.id, role: p.role, orgId: p.orgId, approvalLimitMinor: p.approvalLimitMinor, capabilities: p.capabilities, authMethod: p.authMethod }, req.id); });
     api.get("/schemas", async req => wrap({ contractVersion: "1.0.0", schemas: apiSchemas }, req.id));
@@ -185,5 +217,6 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/sources/search", async req => wrap({ items: await service.search(await principal(req), String((req.query as any).q ?? "")), exhaustive: false }, req.id));
   }, { prefix: "/v1" });
   attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity);
+  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity,{path:'/mcp/orchestration',readOnly:true});
   return app;
 }
