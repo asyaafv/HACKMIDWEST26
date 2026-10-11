@@ -47,7 +47,7 @@ beforeAll(async()=>{
   await admin.query("INSERT INTO source_records VALUES($1,$2,$3,'UNIT_TEST_ONLY','manifest','crm',$4,'unit.json','','hash',$5)",[related,controls.orgId,project,`${source}-TICKET`,{id:`${source}-TICKET`}]);
   await admin.query("INSERT INTO source_links VALUES($1,$2,$3,'/ticket')",[controls.orgId,primary,related]);
  }
- proposal={agentId:a.agentId,projectId:a.projectId,merchantId:controls.merchantId,amountMinor:'20000',currency:'USD',category:'diagnostics',purpose:'Identity test purchase',source:{domain:'pm',sourceId:'SOURCE-A'}};
+ proposal={agentId:a.agentId,projectId:a.projectId,merchantId:controls.merchantId,amountMinor:'170000',currency:'USD',category:'diagnostics',purpose:'Identity test purchase',source:{domain:'pm',sourceId:'SOURCE-A'}};
  // Bind an ephemeral port before constructing the exact Host allowlist.
  app=createApp(runtime,{mcpHosts:[]});url=await app.listen({port:0,host:'127.0.0.1'});
  await app.close();app=createApp(runtime,{mcpHosts:[new URL(url).host]});await app.listen({port:Number(new URL(url).port),host:'127.0.0.1'});
@@ -137,7 +137,7 @@ it('recovers a lost submission response using the original key and retained paym
    if(args[0].name==='gate_request_spend'&&!dropped){dropped=true;throw new Error('Unit-only dropped response after real server commit');}
    return result;
   }) as Client['callTool'];
-  const p={...proposal,amountMinor:'20001',purpose:'Separate lost-response test purchase'},key=randomUUID();
+  const p={...proposal,amountMinor:'170001',purpose:'Separate lost-response test purchase'},key=randomUUID();
   const result=await runGatekeeperScenario(client,{proposal:p,permissionToRecord:true,idempotencyKey:key});const id=(result.request as any).id;
   expect((await admin.query('SELECT count(*) FROM idempotency_records WHERE org_id=$1 AND principal_id=$2 AND key=$3',[controls.orgId,a.principalId,key])).rows[0].count).toBe('1');
   const finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`),preview=await service.preview(finance,id,randomUUID());

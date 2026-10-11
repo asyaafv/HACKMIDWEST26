@@ -66,7 +66,7 @@ it('opens without login, polls actual MCP records, and replays a lost review res
 });
 it('reviews existing payments without financial mutations and rejects stale, racing, and foreign-origin actions',async()=>{
  const service=new GateService(runtime),operator=await authenticate(runtime,`Bearer ${controls.identities.OPERATOR!.token}`),finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`);
- const created=await service.create(operator,{agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'20001',currency:'USD',category:'diagnostics',purpose:'Previously stored payment',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}},randomUUID());
+ const created=await service.create(operator,{agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Previously stored payment',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}},randomUUID());
  const preview=await service.preview(finance,created.id,randomUUID());
  await service.consent(finance,created.id,{choice:'approve',previewId:preview.id,previewHash:preview.previewHash,expectedVersion:preview.expectedVersion,reason:'Isolated historical payment setup',reviewResolutions:preview.decision.reviewRequirements.filter((r:any)=>r.resolution==='HUMAN_JUDGMENT').map((r:any)=>r.code)},randomUUID());
  const before=(await admin.query('SELECT row_to_json(p) AS payment FROM payments p WHERE request_id=$1',[created.id])).rows[0].payment;
@@ -99,7 +99,7 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
  await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
  await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
- await page.getByLabel('Amount (USD)',{exact:true}).fill('742.35');
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('1742.35');
  await page.getByLabel('Spend category',{exact:true}).selectOption('incident_response');
  await page.getByLabel('Business purpose',{exact:true}).fill('Simulated agent purchase from Gatekeepers');
  await page.getByLabel('Find supporting evidence').fill('GATE-ISSUE-101');await page.getByRole('button',{name:'Search sources'}).click();
@@ -115,7 +115,7 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await page.getByRole('dialog',{name:'Simulate purchase',exact:true}).getByRole('button',{name:'Record simulated request',exact:true}).click();
  await browserExpect(page.getByRole('dialog',{name:'Simulate purchase',exact:true})).toHaveCount(0);
  await browserExpect(page.getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
- await browserExpect(page.getByText('Simulated purchase proposal · imported synthetic context. No payment is executed or live DevRev record sync configured.',{exact:true})).toBeVisible();
+ await browserExpect(page.getByText('Simulated purchase proposal · imported synthetic context. Payments use the local sandbox provider.',{exact:true})).toBeVisible();
  await browserExpect(page.getByText('Waiting for Gatekeeper',{exact:true}).first()).toBeVisible();
  await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toHaveCount(0);
  await page.route('**/v1/demo/transactions/*/investigation',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/investigation');});
@@ -128,7 +128,7 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await page.getByText('Evaluation history (2)',{exact:true}).click();
  await browserExpect(page.getByText('Version 2: REVIEW · 20 risk points',{exact:true})).toBeVisible();
  const rows=(await admin.query("SELECT * FROM requests WHERE proposal->>'purpose'='Simulated agent purchase from Gatekeepers'")).rows;
- expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({origin:'SIMULATED_PURCHASE',amount_minor:'74235',version:2});
+ expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({origin:'SIMULATED_PURCHASE',amount_minor:'174235',version:2});
  expect(rows[0].proposal.category).toBe('incident_response');
  expect(rows[0].evidence.items.length).toBeGreaterThan(0);expect(rows[0].decision.rules.length).toBeGreaterThan(0);
  expect((await admin.query('SELECT (SELECT count(*) FROM payments) AS payments,(SELECT count(*) FROM jobs) AS jobs,(SELECT count(*) FROM budget_entries) AS entries')).rows[0]).toEqual(before);
