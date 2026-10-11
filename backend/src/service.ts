@@ -113,7 +113,7 @@ export class GateService {
 
   /** Reevaluation is advisory: it cannot reserve budget or create a payment. */
   async evaluateInvestigation(tx:Tx,principal:Principal,row:any,evidence:any) {
-    const ctx=await context(tx,principal,row.proposal);
+    const ctx=await context(tx,principal,row.proposal,true);
     return decisionFor(tx,principal,row.proposal,ctx,evidence.complete,Boolean(evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
   }
   async evaluationHistory(principal:Principal,id:string) {
