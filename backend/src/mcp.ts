@@ -6,16 +6,19 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { DB } from "./db.js";
 import type { GateService } from "./service.js";
 import { authenticate } from "./auth.js";
+import { authenticateDevRevMcp, type DevRevMcpIdentity } from "./devrev-auth.js";
 import { toolSchemas, toolOutputSchema, SERVER_VERSION } from "./mcp-schemas.js";
 import { capabilityAccess, TOOL_CAPABILITIES } from "./capabilities.js";
 import { listRequests, sourceContext } from "./mcp-context.js";
 import { GateError, requireThat } from "./errors.js";
 
-export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = []) {
+export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = [], devrevIdentity?: DevRevMcpIdentity) {
   app.route({ method: ["GET", "POST", "DELETE"], url: "/mcp", handler: async (req, reply) => {
     requireThat(allowedHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "MCP host not allowed.", 403);
     if (req.headers.origin) requireThat(allowedOrigins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "MCP origin not allowed.", 403);
-    const principal = await authenticate(db, req.headers.authorization);
+    const principal = devrevIdentity && req.headers.authorization?.startsWith("Bearer ") && !/^Bearer [a-f0-9]{64}$/.test(req.headers.authorization)
+      ? await authenticateDevRevMcp(db, req.headers.authorization, devrevIdentity)
+      : await authenticate(db, req.headers.authorization);
     if (req.method !== "POST") return reply.code(405).header("Allow", "POST").send({ error: "Stateless MCP accepts POST only." });
     const server = new McpServer({ name: "Gate", version: SERVER_VERSION });
     const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };

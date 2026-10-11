@@ -19,8 +19,9 @@ import { GateService } from "./service.js";
 import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
+import type { DevRevMcpIdentity } from "./devrev-auth.js";
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace } = {}) {
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db);
@@ -117,6 +118,6 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/requests/:id/explanation", async req => wrap(await service.explain(await principal(req), id(req)), req.id));
     api.get("/sources/search", async req => wrap({ items: await service.search(await principal(req), String((req.query as any).q ?? "")), exhaustive: false }, req.id));
   }, { prefix: "/v1" });
-  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins);
+  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity);
   return app;
 }
