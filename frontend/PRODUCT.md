@@ -6,7 +6,7 @@
 web
 
 ## Stack
-User-approved React, TypeScript, and Vite. Typed asynchronous local demo service, replaceable by a backend adapter.
+User-approved React, TypeScript, and Vite. PostgreSQL-backed asynchronous dashboard adapter.
 
 ## Users
 Agent operators and finance reviewers inspecting proposed company spending, its business evidence, and policy decisions.
@@ -15,7 +15,13 @@ Agent operators and finance reviewers inspecting proposed company spending, its 
 Make every agent transaction and its reason inspectable in a working hackathon frontend demo.
 
 ## Capabilities and Constraints
-Seven pages: Overview, Needs a decision, Transactions/Requests, Gatekeepers, Policies, Audit log, Settings. Overview is the home screen; the focused decision inbox includes all pending requests, ordered by priority then oldest first. Local request creation and decisions, Gatekeeper management, editable future-evaluation policies, and versioned persistence. No backend calls or financial execution. The repository's broader backend plan is context, not this frontend's implementation scope.
+Seven pages: Overview, Needs a decision, Transactions/Requests, Gatekeepers,
+Policies, Audit log, Settings. Opens without login into the shared hackathon
+workspace. Stored requests and linked historical payments refresh every five
+seconds. Approve/reject persists an independent Gate transaction review and reason;
+it does not mutate financial state. Agent/policy configuration is read-only.
+No local fixtures substitute for unavailable backend data. DevRev is pending.
+
 
 ## Brand Commitments
 
@@ -35,7 +41,7 @@ Reference screenshot and original logo PNG supplied in chat; ten original charac
 ## Updated scope: backend-connected main dashboard
 
 The earlier local-demo capabilities above are historical. The main dashboard now
-uses authenticated scoped PostgreSQL responses and has no fixture fallback.
+uses scoped PostgreSQL responses through the shared no-login demo workspace and has no fixture fallback.
 Unsupported agent/policy configuration writes are read-only. Finance review is a
 version-bound enterprise decision with no payment/job/budget reservation. The
 backend console and separate /live UI are removed. DevRev is an independent

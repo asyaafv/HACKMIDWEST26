@@ -1,3 +1,4 @@
+/** Dashboard domain types keep financial state separate from Gate review state. */
 export type Decision = 'Approved' | 'Pending' | 'Blocked';
 export type Priority = 'P0' | 'P1' | 'P2';
 export type PolicyKind = 'vendors' | 'budget' | 'limit' | 'purpose' | 'categories' | 'risk';
@@ -9,6 +10,7 @@ export interface Evidence { id: string; title: string; subtitle: string; kind: '
 export interface Transaction {
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
+  reviewBinding?: {version:number;snapshotHash:string};
   workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; backend?: unknown; historicalPayment?: unknown; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
 }
 export interface AuditEvent { id: string; type: 'request' | 'decision' | 'gatekeeper' | 'policy' | 'settings'; title: string; detail: string; createdAt: string; actor: string; transactionId?: string; agentId?: string }

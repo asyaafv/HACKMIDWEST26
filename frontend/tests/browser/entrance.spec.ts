@@ -109,7 +109,7 @@ test('mobile completes without overflow or a hidden-logo flight', async ({ page 
   await expect(page.getByRole('link', { name: 'Overview', exact: true })).toBeVisible();
 });
 
-test('direct mobile request keeps its own scroll lock and focus after welcome and login', async ({ page }) => {
+test('direct mobile request keeps its own scroll lock and focus after welcome and automatic load', async ({ page }) => {
   await mockBackend(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await freeze(page); await page.goto('/transactions?request=REQ-1842'); await scene(page);
@@ -119,5 +119,6 @@ test('direct mobile request keeps its own scroll lock and focus after welcome an
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
   expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe('');
   await page.getByRole('button', { name: 'Close transaction details' }).click();
+  await expect(page.locator('.detail-panel')).toHaveCount(0);
   await released(page);
 });

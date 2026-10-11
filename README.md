@@ -16,22 +16,22 @@ starts PostgreSQL, applies migrations, prepares synthetic demo context without
 resetting history, and starts the API and frontend. It does **not** start a payment
 worker. Node.js 22.12+ is required; the launcher can use Codex's bundled runtime.
 
-The dashboard prompts for your identity. Local development accepts an operator,
-finance or auditor token from the ignored `backend/work/demo-credentials.json`;
-credentials remain in memory. Hosted login requires provisioned human accounts,
-same-origin HTTPS routing and the backend's secure session/CSRF flow. Do not share
-or commit credentials.
+The dashboard opens directly without login or tokens and refreshes PostgreSQL
+records every five seconds. The launcher selects one prepared demo organization
+and its shared finance reviewer. Dashboard decisions are attributed to that shared
+hackathon workspace, not to an individually authenticated person. DevRev/MCP and
+the other REST routes retain their separate authentication.
 
 The backend console and separate `/live` workspace have been removed. All product
 screens use the main dashboard. Agent/policy configuration is read-only where no
 backend editing endpoint exists. No browser-local transaction fixtures are used
 as fallback when the API is unavailable.
 
-A finance review records the exact, expiring proposal and decision through
-`POST /v1/requests/:id/review`. Approval does not create a payment, queue a job,
-reserve budget, or move money. Existing payment records remain readable. Legacy
-payment simulation code is retained for regression tests; payment-executing REST
-consent is disabled in the normal API process.
+The dashboard reads stored `requests` with their linked `payments`, including
+historical payment details. A separate `transaction_reviews` row records approval
+or rejection, its reason and the reviewed snapshot; the original request status,
+payment status and budget balances are preserved. No payment worker is started.
+An empty database produces an empty dashboard; no sample transactions are invented.
 
 Press Ctrl+C to stop services owned by the launcher. Existing history is preserved.
 Logs are in backend/work. `./run-gate.sh --smoke` verifies startup and then stops

@@ -1,4 +1,5 @@
-/** Fastify REST boundary: validates requests, authenticates bearer identities, and returns safe errors. */
+/** REST boundary keeps shared demo reads/reviews separate from authenticated API and MCP workflows. */
+import { demoPrincipal, reviewTransaction, type DemoWorkspace } from "./transaction-review.js";
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { transaction } from "./db.js";
@@ -18,7 +19,7 @@ import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[] } = {}) {
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db);
@@ -41,10 +42,25 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     req.log.error({ code: "INTERNAL_ERROR", traceId: req.id }, "Gate request failed");
     return reply.code(500).send({ error: { code: "INTERNAL_ERROR", message: "Request could not be completed." }, meta: { traceId: req.id } });
   });
-  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox", dashboard: true, paymentExecution: !!options.paymentExecution }));
+  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox", dashboard: true, demoDashboard: !!options.demoWorkspace, paymentExecution: !!options.paymentExecution }));
   app.get("/health/ready", async () => { await db.query("SELECT 1"); return { ok: true, service: "gate-backend" }; });
   const browserHosts = options.browserHosts ?? ["localhost:8000", "127.0.0.1:8000"];
   app.register(authRoutes, { prefix: "/v1", db, origins, hosts: browserHosts });
+  // Anonymous access is limited to one explicitly configured demo workspace; MCP remains authenticated.
+  if (options.demoWorkspace) app.register(async demo => {
+    demo.addHook('onRequest', async req => {
+      requireThat(browserHosts.includes(req.headers.host ?? ''), 'HOST_FORBIDDEN', 'Host not allowed.', 403);
+      if (req.method !== 'GET') requireThat(!!req.headers.origin && origins.includes(req.headers.origin)
+        && req.headers['sec-fetch-site'] !== 'cross-site', 'ORIGIN_FORBIDDEN', 'Review requires the dashboard origin.', 403);
+    });
+    demo.get('/dashboard', async req => {
+      const p = await demoPrincipal(db,options.demoWorkspace!);
+      return {data:{...await service.dashboard(p),identity:{id:p.id,orgId:p.orgId,role:p.role,capabilities:p.capabilities,actorMode:'shared_hackathon_demo'}},meta:{traceId:req.id}};
+    });
+    demo.post('/transactions/:id/review', async req => ({data:await reviewTransaction(db,
+      await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
+  }, {prefix:'/v1/demo'});
+
   app.register(async api => {
     api.addHook("onRequest", async req => { if (!req.headers.authorization && !req.headers.cookie) requireThat(false, "UNAUTHENTICATED", "A valid credential or session is required.", 401);
       if (req.url.split("?")[0]?.endsWith("/fault")) {
