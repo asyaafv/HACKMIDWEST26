@@ -50,6 +50,8 @@ it('opens without login, polls actual MCP records, and replays a lost review res
  try {
   const request=await callGateTool(client,'gate_request_spend',{agentId:gatekeeper.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Automatically discovered MCP transaction',source:{domain:'pm',sourceId:'GATE-ISSUE-101'},idempotency_key:randomUUID()}) as {id:string};
   await page.getByRole('button',{name:new RegExp(`Open ${request.id}`)}).click();
+  await page.getByRole('button',{name:'Run local investigation',exact:true}).click();
+  await browserExpect(page.getByText('Policy evaluated',{exact:true}).first()).toBeVisible();
   await page.getByRole('button',{name:'Approve transaction',exact:true}).click();await page.getByLabel('Decision reason').fill('Reviewed enterprise context');
   await page.route('**/v1/demo/transactions/*/review',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/review');});
   await page.getByRole('button',{name:'Record approval'}).click();await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
@@ -113,9 +115,20 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await page.getByRole('dialog',{name:'Simulate purchase',exact:true}).getByRole('button',{name:'Record simulated request',exact:true}).click();
  await browserExpect(page.getByRole('dialog',{name:'Simulate purchase',exact:true})).toHaveCount(0);
  await browserExpect(page.getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
- await browserExpect(page.getByText('Simulated purchase · imported synthetic context evaluated by Gate. No live DevRev record sync is configured.',{exact:true})).toBeVisible();
+ await browserExpect(page.getByText('Simulated purchase proposal · imported synthetic context. No payment is executed or live DevRev record sync configured.',{exact:true})).toBeVisible();
+ await browserExpect(page.getByText('Waiting for Gatekeeper',{exact:true}).first()).toBeVisible();
+ await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toHaveCount(0);
+ await page.route('**/v1/demo/transactions/*/investigation',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/investigation');});
+ await page.getByRole('button',{name:'Run local investigation',exact:true}).click();
+ await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
+ await page.getByRole('button',{name:/Run local investigation|Recheck demo evidence/}).click();
+ await browserExpect(page.getByText('Policy evaluated',{exact:true}).first()).toBeVisible();
+ await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toBeEnabled();
+ if(process.env.GATE_UI_CAPTURE){await page.locator('.detail-panel').evaluate(node=>{node.scrollTop=0;});await page.locator('.detail-panel').screenshot({path:process.env.GATE_UI_CAPTURE});}
+ await page.getByText('Evaluation history (2)',{exact:true}).click();
+ await browserExpect(page.getByText('Version 2: REVIEW · 20 risk points',{exact:true})).toBeVisible();
  const rows=(await admin.query("SELECT * FROM requests WHERE proposal->>'purpose'='Simulated agent purchase from Gatekeepers'")).rows;
- expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({origin:'SIMULATED_PURCHASE',amount_minor:'74235'});
+ expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({origin:'SIMULATED_PURCHASE',amount_minor:'74235',version:2});
  expect(rows[0].proposal.category).toBe('incident_response');
  expect(rows[0].evidence.items.length).toBeGreaterThan(0);expect(rows[0].decision.rules.length).toBeGreaterThan(0);
  expect((await admin.query('SELECT (SELECT count(*) FROM payments) AS payments,(SELECT count(*) FROM jobs) AS jobs,(SELECT count(*) FROM budget_entries) AS entries')).rows[0]).toEqual(before);

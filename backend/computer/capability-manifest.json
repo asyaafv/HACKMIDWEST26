@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "transport": "stateless Streamable HTTP",
   "authentication": "Gate bearer; server-owned identity",
   "mode": "sandbox",
@@ -7,6 +7,373 @@
   "remoteVerified": false,
   "datasetVersion": "per-source; top-level null until a single active version is configured",
   "tools": [
+    {
+      "name": "gate_list_investigations",
+      "capability": "investigation:write",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {},
+          "mode": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "provider": {
+            "type": "string",
+            "const": "simulator"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "dataset_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "data",
+          "mode",
+          "provider",
+          "trace_id",
+          "server_version",
+          "dataset_version"
+        ],
+        "additionalProperties": false
+      },
+      "readOnly": true,
+      "idempotent": true
+    },
+    {
+      "name": "gate_start_investigation",
+      "capability": "investigation:write",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "request_id",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {},
+          "mode": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "provider": {
+            "type": "string",
+            "const": "simulator"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "dataset_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "data",
+          "mode",
+          "provider",
+          "trace_id",
+          "server_version",
+          "dataset_version"
+        ],
+        "additionalProperties": false
+      },
+      "readOnly": false,
+      "idempotent": true
+    },
+    {
+      "name": "gate_submit_evidence",
+      "capability": "investigation:write",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "report": {
+            "type": "object",
+            "properties": {
+              "sources": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "domain": {
+                      "type": "string",
+                      "enum": [
+                        "pm",
+                        "crm",
+                        "document"
+                      ]
+                    },
+                    "sourceId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "sourceHash": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "contentHash": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "domain",
+                    "sourceId",
+                    "sourceHash",
+                    "contentHash"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "links": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fromId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "toId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "basisPointer": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "relationship": {
+                      "type": "string",
+                      "enum": [
+                        "ISSUE_TICKET",
+                        "TICKET_ACCOUNT",
+                        "DOCUMENT_TICKET",
+                        "EXPLICIT_REFERENCE"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "fromId",
+                    "toId",
+                    "basisPointer",
+                    "relationship"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "unresolvedQuestions": {
+                "default": [],
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              }
+            },
+            "required": [
+              "sources",
+              "links",
+              "unresolvedQuestions"
+            ],
+            "additionalProperties": false
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "runId",
+          "report",
+          "request_id",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {},
+          "mode": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "provider": {
+            "type": "string",
+            "const": "simulator"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "dataset_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "data",
+          "mode",
+          "provider",
+          "trace_id",
+          "server_version",
+          "dataset_version"
+        ],
+        "additionalProperties": false
+      },
+      "readOnly": false,
+      "idempotent": true
+    },
+    {
+      "name": "gate_fail_investigation",
+      "capability": "investigation:write",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "runId",
+          "reason",
+          "request_id",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {},
+          "mode": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "provider": {
+            "type": "string",
+            "const": "simulator"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "dataset_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "data",
+          "mode",
+          "provider",
+          "trace_id",
+          "server_version",
+          "dataset_version"
+        ],
+        "additionalProperties": false
+      },
+      "readOnly": false,
+      "idempotent": true
+    },
     {
       "name": "gate_catalog",
       "capability": "catalog:read",

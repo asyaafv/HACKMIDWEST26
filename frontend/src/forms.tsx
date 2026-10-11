@@ -30,7 +30,7 @@ export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose
 /** DevRev-facing proposal fields map exactly to Gate's shared REST/MCP contract. */
 export function RequestForm({ onClose, onCreated, simulation = false }: { onClose: () => void; onCreated: (id: string) => void; simulation?: boolean }) {
  const {state,run,busy}=useDemo();const merchants=state!.merchants??[];
- const active=state!.agents.filter(a=>a.active&&(simulation||a.ownerId===state!.identity?.id));
+ const active=state!.agents.filter(a=>a.active&&(simulation?a.canPurchase!==false:a.ownerId===state!.identity?.id));
  const [agentId,setAgent]=useState(active[0]?.id??''),[merchantId,setMerchant]=useState(merchants[0]?.id??''),[amount,setAmount]=useState(''),[category,setCategory]=useState<'diagnostics'|'incident_response'>('diagnostics'),[purpose,setPurpose]=useState(''),[query,setQuery]=useState(''),[sourceId,setSource]=useState(''),[sources,setSources]=useState<SourceResult[]>([]),[error,setError]=useState('');
  const [searching,setSearching]=useState(false),[previewing,setPreviewing]=useState(false),[preview,setPreview]=useState<{signature:string;result:PurchasePreview}|null>(null);
  const [started,setStarted]=useState(false);

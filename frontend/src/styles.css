@@ -412,3 +412,13 @@ dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
   .decision-summary-footer { flex-wrap: wrap; }
   .caught-up h2 { font-size: 18px; }
 }
+
+/* Persisted investigation steps reuse the dashboard's existing card and text treatment. */
+.investigation-section { padding: 18px 0; border-bottom: 1px solid rgba(128,128,128,.22); }
+.investigation-badge { font-weight: 700; }
+.investigation-steps { list-style: none; padding: 0; display: grid; gap: 8px; }
+.investigation-steps li { opacity: .65; }
+.investigation-steps li[data-complete="true"] { opacity: 1; }
+.evaluation-history { margin-top: 16px; }
+.evaluation-history summary { cursor: pointer; }
+.evaluation-history article { padding: 12px 0; border-top: 1px solid rgba(128,128,128,.22); }

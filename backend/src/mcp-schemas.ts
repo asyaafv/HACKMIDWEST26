@@ -1,9 +1,14 @@
 /** Discovery and the checked-in manifest share one source of tool schemas. */
 import { z } from 'zod';
 import { proposalSchema,idSchema,keySchema } from './contracts.js';
+import { startInvestigationSchema,submitEvidenceSchema,failInvestigationSchema } from './investigation-contracts.js';
 import { listInput } from './mcp-context.js';
-export const SERVER_VERSION='0.3.0';
+export const SERVER_VERSION='0.4.0';
 export const toolSchemas={
+ gate_list_investigations:z.object({limit:z.number().int().min(1).max(50).default(20)}).strict(),
+ gate_start_investigation:startInvestigationSchema.extend({request_id:idSchema,idempotency_key:keySchema}),
+ gate_submit_evidence:submitEvidenceSchema.extend({request_id:idSchema,idempotency_key:keySchema}),
+ gate_fail_investigation:failInvestigationSchema.extend({request_id:idSchema,idempotency_key:keySchema}),
  gate_catalog:z.object({}).strict(),
  gate_search_context:z.object({query:z.string().min(2).max(200)}).strict(),
  gate_get_context:z.object({source_domain:z.enum(['pm','crm','document']),source_id:z.string().min(1).max(200)}).strict(),

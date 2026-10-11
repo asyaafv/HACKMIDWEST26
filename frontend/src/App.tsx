@@ -7,6 +7,7 @@ import { money } from './data';
 import { IconButton } from './components';
 import { AuditLog, Decisions, Gatekeepers, Overview, Policies, SettingsPage, Transactions } from './pages';
 import { AnimationPreview } from './AnimatedAvatar';
+import { pendingRequests } from './decisions';
 
 const navigation = [{ path: '/overview', label: 'Overview', icon: HouseLine }, { path: '/decisions', label: 'Needs a decision', icon: WarningCircle }, { path: '/transactions', label: 'Transactions', icon: ArrowsLeftRight }, { path: '/gatekeepers', label: 'Gatekeepers', icon: Users }, { path: '/policies', label: 'Policies', icon: ShieldCheck }, { path: '/audit-log', label: 'Audit log', icon: ClipboardText }];
 export default function App() {
@@ -28,7 +29,7 @@ export default function App() {
     return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', handle); menuRef.current?.focus(); };
   }, [mobileNav]);
   const merchants = state?.merchants ?? [];
-  const pendingCount = state?.transactions.filter(t => t.decision === 'Pending').length ?? 0;
+  const pendingCount = state ? pendingRequests(state.transactions).length : 0;
   const resultTransactions = state?.transactions.filter(t => `${t.id} ${merchants.find(m => m.id === t.merchantId)!.name} ${state.agents.find(a => a.id === t.agentId)!.name}`.toLowerCase().includes(search.toLowerCase())).slice(0, 5) ?? [];
   const resultAgents = state?.agents.filter(a => `${a.name} ${a.description}`.toLowerCase().includes(search.toLowerCase())).slice(0, 3) ?? [];
   return <IconContext.Provider value={{ weight: 'regular' }}><div className={`app ${state?.settings.compact ? 'compact' : ''}`}>

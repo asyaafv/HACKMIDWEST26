@@ -34,8 +34,10 @@ payment status and budget balances are preserved. No payment worker is started.
 An empty database produces an empty dashboard. To create a labeled demo proposal,
 open Gatekeepers → Simulate purchase. It runs the real policy/evidence engine using
 imported sources. The form uses Gate's DevRev proposal fields and shows a read-only
-policy preview before it records the sandbox request. Live DevRev record sync is
-not configured.
+policy preview before it records the sandbox request. The recorded proposal waits
+for a Gatekeeper investigation. Open its detail and choose Run local investigation
+to test imported evidence, then review the resulting policy decision. Live DevRev
+record sync and the new Gatekeeper investigation flow are not yet verified.
 
 Press Ctrl+C to stop services owned by the launcher. Existing history is preserved.
 Logs are in backend/work. `./run-gate.sh --smoke` verifies startup and then stops

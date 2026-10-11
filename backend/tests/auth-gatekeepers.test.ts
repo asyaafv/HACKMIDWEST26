@@ -65,7 +65,7 @@ it('uses scrypt with independent salts and rejects wrong passwords',async()=>{
 it('uses real scoped SDK identities, independent finance consent, and actual payment outcome',async()=>{
  const client=await connect(a.token);
  try {
-  const tools=(await client.listTools()).tools;expect(tools.map(t=>t.name)).toEqual(['gate_catalog','gate_search_context','gate_get_context','gate_preview_spend','gate_request_spend','gate_list_requests','gate_get_request']);expect(tools.some(t=>t.name.includes('consent'))).toBe(false);
+  const tools=(await client.listTools()).tools;expect(tools.map(t=>t.name)).toEqual(['gate_list_investigations','gate_start_investigation','gate_submit_evidence','gate_fail_investigation','gate_catalog','gate_search_context','gate_get_context','gate_preview_spend','gate_request_spend','gate_list_requests','gate_get_request']);expect(tools.some(t=>t.name.includes('consent'))).toBe(false);
   await expect(runGatekeeperScenario(client,{proposal,permissionToRecord:false,idempotencyKey:randomUUID()})).rejects.toMatchObject({code:'RECORD_PERMISSION_REQUIRED'});
   const key=randomUUID(),result=await runGatekeeperScenario(client,{proposal,permissionToRecord:true,idempotencyKey:key});const id=(result.request as any).id;
   const repeat=await callGateTool(client,'gate_request_spend',{...proposal,idempotency_key:key}) as any;expect(repeat.id).toBe(id);

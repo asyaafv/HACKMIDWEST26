@@ -17,7 +17,7 @@ export async function simulatePurchase(db: DB, service: GateService, reviewer: P
       JOIN principals p ON p.org_id=a.org_id AND p.id=a.owner_id
       JOIN credentials c ON c.org_id=p.org_id AND c.principal_id=p.id
       WHERE a.org_id=$1 AND a.id=$2 AND a.project_id=$3 AND a.active AND p.active
-      AND p.role IN ('OPERATOR','AGENT') AND c.revoked_at IS NULL
+      AND p.role IN ('OPERATOR','AGENT') AND c.revoked_at IS NULL AND 'request:submit'=ANY(c.capabilities)
       ORDER BY c.expires_at DESC,c.id LIMIT 1`, [reviewer.orgId,proposal.agentId,proposal.projectId])).rows[0];
     requireThat(row,'SIMULATION_UNAVAILABLE','This purchasing agent is not ready for simulation.',422);
     await projectAccess(tx,{...reviewer,id:row.id},proposal.projectId);
