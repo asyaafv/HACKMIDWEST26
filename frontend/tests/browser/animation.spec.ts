@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { connectFixture } from './backend-fixture';
 
 test.use({ reducedMotion: 'no-preference' });
 
 test('some dashboard agents hold both eyes closed and smoothly reopen', async ({ page }) => {
-  await page.goto('/gatekeepers');
+  await connectFixture(page,'/gatekeepers');
   const resting = page.locator('.animated-avatar[data-action="rest-eyes"]');
   await expect.poll(() => resting.evaluateAll(avatars => avatars.some(avatar =>
     [...avatar.querySelectorAll('.rig-outline')].every(eye => eye.getAttribute('data-openness') === '0')
@@ -15,7 +16,7 @@ test('some dashboard agents hold both eyes closed and smoothly reopen', async ({
 });
 
 test('ambient turns change the rendered portrait, not only its activity flag', async ({ page }) => {
-  await page.goto('/gatekeepers');
+  await connectFixture(page,'/gatekeepers');
   await expect.poll(() => page.locator('.animated-avatar').evaluateAll(avatars => avatars.some(avatar => {
     const svg = avatar.querySelector('svg')!;
     const matrix = new DOMMatrix(getComputedStyle(svg).transform);
@@ -27,7 +28,7 @@ test('ambient turns change the rendered portrait, not only its activity flag', a
 });
 
 test('expressions can interrupt each other and replay; pause stops ambient motion', async ({ page }) => {
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');
   const apertures = rig.locator('.rig-outline');
   await expect(rig).toHaveAttribute('data-running', 'true');
@@ -57,7 +58,7 @@ test('expressions can interrupt each other and replay; pause stops ambient motio
 test('reduced motion keeps controls usable; mobile has no overflow', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');
   await expect(rig).toHaveAttribute('data-running', 'false');
   await page.getByRole('button', { name: 'Wink', exact: true }).click();
@@ -70,12 +71,12 @@ test('reduced motion keeps controls usable; mobile has no overflow', async ({ pa
 });
 
 test('offscreen characters stop and every character uses the rig', async ({ page }) => {
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   await page.setViewportSize({ width: 390, height: 500 });
   const rig = page.locator('.motion-stage .animated-avatar');
   await page.getByRole('button', { name: 'Close eyes', exact: true }).scrollIntoViewIfNeeded();
   await expect(rig).toHaveAttribute('data-running', 'false');
-  await page.goto('/gatekeepers');
+  await connectFixture(page,'/gatekeepers');
   await expect(page.locator('.gatekeeper-card .animated-avatar')).toHaveCount(10);
   await expect(page.locator('.gatekeeper-card img.avatar')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Try the animated character' })).toBeVisible();
@@ -83,7 +84,7 @@ test('offscreen characters stop and every character uses the rig', async ({ page
 
 
 test('pointer tracking yields to explicit look controls and returns smoothly', async ({ page }) => {
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');
   await rig.hover({ position: { x: 430, y: 240 } });
   const eyePairX = () => rig.locator('.rig-eye-pair').evaluate(e => Number(e.getAttribute('transform')?.match(/translate\(([-\d.]+)/)?.[1]));
@@ -101,7 +102,7 @@ test('pointer tracking yields to explicit look controls and returns smoothly', a
 
 test('a wink resumes from its frozen pose after pause and hidden-tab suspension', async ({ page }) => {
   await page.clock.install();
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');
   await expect(rig).toHaveAttribute('data-running', 'true');
   await page.clock.pauseAt(new Date(Date.now() + 100));
@@ -139,10 +140,12 @@ test('every character has a clean plate, stable personality and larger table por
     expect(result.ok()).toBe(true);
     expect(result.headers()['content-type']).toContain('image/png');
   }
-  await page.goto('/gatekeepers');
+  await connectFixture(page,'/gatekeepers');
   const assignments = await page.locator('.gatekeeper-card .animated-avatar').evaluateAll(es => es.map(e => e.getAttribute('data-motion')));
   expect(new Set(assignments).size).toBe(4);
   await page.reload();
+  await page.getByLabel('Local access token').fill('VISUAL_TEST_ONLY');
+  await page.getByRole('button',{name:'Connect to backend'}).click();
   await expect(page.locator('.gatekeeper-card .animated-avatar')).toHaveCount(10);
   expect(await page.locator('.gatekeeper-card .animated-avatar').evaluateAll(es => es.map(e => e.getAttribute('data-motion')))).toEqual(assignments);
   await expect(page.locator('.gatekeeper-card .animated-avatar').first()).toHaveCSS('width', '160px');
@@ -151,12 +154,12 @@ test('every character has a clean plate, stable personality and larger table por
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const route of ['/transactions', '/overview']) {
-    await page.goto(route);
+    await connectFixture(page,route);
     const portrait = page.locator('table .animated-avatar').first();
     await expect(portrait).toHaveCSS('width', '72px');
     await expect(portrait).toHaveCSS('height', '72px');
   }
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   await page.getByLabel('Character', { exact: true }).selectOption('7');
   await expect(page.locator('.motion-stage .animated-avatar')).toHaveAttribute('data-character', '7');
   await page.getByRole('button', { name: 'Close eyes', exact: true }).click();
@@ -165,7 +168,7 @@ test('every character has a clean plate, stable personality and larger table por
 
 test('dashboard agents animate independently with quiet gaps per portrait', async ({ page }) => {
   await page.clock.install();
-  await page.goto('/gatekeepers');
+  await connectFixture(page,'/gatekeepers');
   await expect(page.locator('.gatekeeper-card .animated-avatar')).toHaveCount(10);
   await page.clock.pauseAt(new Date(Date.now() + 100));
   const previous = new Map<number, boolean>(), ended = new Map<number, number>();
@@ -190,13 +193,14 @@ test('dashboard agents animate independently with quiet gaps per portrait', asyn
   expect(maxConcurrent).toBeGreaterThan(1);
   expect(animated.size).toBeGreaterThan(1);
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/overview');
+  await page.clock.resume();
+  await connectFixture(page,'/overview');
   await expect(page.getByRole('heading', { name: 'Workspace overview' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test('only the selected transaction portrait floats and selection transfers immediately', async ({ page }) => {
-  await page.goto('/transactions');
+  await connectFixture(page,'/transactions?request=REQ-1842');
   const selected = page.locator('tr.selected .animated-avatar');
   await expect(selected).toHaveCount(1);
   await expect(selected).toHaveAttribute('data-selected', 'true');
@@ -214,7 +218,7 @@ test('only the selected transaction portrait floats and selection transfers imme
 });
 
 test('preview float is opt-in, coexists with expressions, and stops on deselection', async ({ page }) => {
-  await page.goto('/animation-preview');
+  await connectFixture(page,'/animation-preview');
   const rig = page.locator('.motion-stage .animated-avatar');
   const toggle = page.getByRole('button', { name: 'Float', exact: true });
   await expect(rig).toHaveCSS('animation-name', 'none');

@@ -41,10 +41,10 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
     WHERE p.org_id=$1 AND r.agent_id=$2 AND p.created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
     AND p.hold_state IN ('HELD','CAPTURED')`, [principal.orgId, proposal.agentId])).rows[0];
   // This fingerprint compares business intent across distinct requests, independent of transport keys.
-  const duplicate = (await tx.query(`SELECT 1 FROM requests r JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
+  const duplicate = (await tx.query(`SELECT 1 FROM requests r LEFT JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
     WHERE r.org_id=$1 AND r.agent_id=$2 AND r.merchant_id=$3 AND r.amount_minor=$4
       AND r.proposal->'source'=$5::jsonb AND r.id<>COALESCE($6::uuid,'00000000-0000-0000-0000-000000000000'::uuid)
-      AND r.created_at>=now()-interval '10 minutes' AND p.status IN ('QUEUED','PROCESSING','UNKNOWN','SUCCEEDED') LIMIT 1`,
+      AND r.created_at>=now()-interval '10 minutes' AND (p.status IN ('QUEUED','PROCESSING','UNKNOWN','SUCCEEDED') OR (r.status='AUTHORIZED' AND EXISTS (SELECT 1 FROM approvals a WHERE a.org_id=r.org_id AND a.request_id=r.id AND a.choice='approve'))) LIMIT 1`,
     [principal.orgId, proposal.agentId, proposal.merchantId, proposal.amountMinor, proposal.source, null])).rows.length > 0;
   return evaluate({ duplicateIntent: duplicate, contradictoryEvidence, proposal, agentActive: ctx.agent.active, agentCapMinor: ctx.agent.cap_minor,
     merchantStatus: ctx.merchant.status,
@@ -55,7 +55,7 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
 function projection(row: any, payment?: any, approval?: any) {
   return { id: row.id, version: row.version, proposal: row.proposal, workflowStatus: row.status,
     policyVerdict: row.decision?.verdict ?? null, consentStatus: approval ? approval.choice === "approve" ? "GRANTED" : "DECLINED" : "NONE",
-    authorizationStatus: payment ? payment.hold_state === "CAPTURED" ? "CONSUMED" : payment.hold_state === "RELEASED" ? "REVOKED" : payment.dispatched_at ? "DISPATCHED" : "READY" : "NONE",
+    authorizationStatus: !payment && approval?.choice === "approve" ? "REVIEWED" : payment ? payment.hold_state === "CAPTURED" ? "CONSUMED" : payment.hold_state === "RELEASED" ? "REVOKED" : payment.dispatched_at ? "DISPATCHED" : "READY" : "NONE",
     decision: row.decision, evidence: row.evidence, createdAt: row.created_at,
     mode: "sandbox", provider: "simulator", payment: payment ? {
       id: payment.id, status: payment.status, holdState: payment.hold_state, operationKey: payment.operation_key,
@@ -137,11 +137,11 @@ export class GateService {
     }));
   }
 
-  async consent(principal: Principal, id: string, input: unknown, key: string) {
+  async consent(principal: Principal, id: string, input: unknown, key: string, executePayment = true) {
     roleAccess(principal, ["FINANCE"]);
     const consent: Consent = consentSchema.parse(input);
     keySchema.parse(key);
-    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.consent", key, { id, consent }, async () => {
+    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, executePayment ? "request.consent" : "request.review", key, { id, consent }, async () => {
       const row = await requestRow(tx, principal, id, true);
       requireThat(row.status === "AWAITING_CONSENT" && row.version === consent.expectedVersion, "STALE_PREVIEW", "Review a new preview before deciding.", 409);
       const preview = (await tx.query("SELECT * FROM previews WHERE org_id=$1 AND request_id=$2 AND id=$3 AND expires_at>now()", [principal.orgId, id, consent.previewId])).rows[0];
@@ -160,6 +160,12 @@ export class GateService {
         const required = live.reviewRequirements.filter(r => r.resolution === "HUMAN_JUDGMENT").map(r => r.code);
         requireThat(required.every(code => consent.reviewResolutions.includes(code)), "REVIEW_UNRESOLVED", "Resolve each required review item.");
         await tx.query("INSERT INTO approvals(id,org_id,request_id,preview_id,actor_id,choice,reason,consent_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", [approvalId, principal.orgId, id, preview.id, principal.id, consent.choice, consent.reason, hash({ consent, principalId: principal.id })]);
+        // Enterprise review records authority and evidence only; no payment or budget mutation.
+        if (!executePayment) {
+          await tx.query("UPDATE requests SET status='AUTHORIZED',version=version+1 WHERE org_id=$1 AND id=$2", [principal.orgId, id]);
+          await appendAudit(tx, principal.orgId, principal.id, "review.approved", id, { approvalId, previewHash: preview.preview_hash, reason: consent.reason, liveDecision: live, paymentExecution: false });
+          return { requestId: id, workflowStatus: "AUTHORIZED", paymentExecution: false };
+        }
         const paymentId = randomUUID();
         await tx.query(`INSERT INTO payments(id,org_id,request_id,approval_id,budget_id,amount_minor,bound_hash,status,hold_state,expires_at,operation_key)
           VALUES($1,$2,$3,$4,$5,$6,$7,'QUEUED','HELD',now()+interval '5 minutes',$1::uuid::text)`, [paymentId, principal.orgId, id, approvalId, ctx.budget.id, row.amount_minor, hash(preview.payload)]);
@@ -177,7 +183,7 @@ export class GateService {
       await tx.query("INSERT INTO approvals(id,org_id,request_id,preview_id,actor_id,choice,reason,consent_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", [approvalId, principal.orgId, id, preview.id, principal.id, consent.choice, consent.reason, hash({ consent, principalId: principal.id })]);
       await tx.query("UPDATE requests SET status='REJECTED',version=version+1 WHERE org_id=$1 AND id=$2", [principal.orgId, id]);
       await appendAudit(tx, principal.orgId, principal.id, "consent.declined", id, { approvalId, reason: consent.reason });
-      return { requestId: id, workflowStatus: "REJECTED", mode: "sandbox" };
+      return { requestId: id, workflowStatus: "REJECTED", mode: "sandbox", ...(!executePayment ? {paymentExecution: false} : {}) };
     }));
   }
 
@@ -270,6 +276,24 @@ export class GateService {
       await appendAudit(tx, principal.orgId, principal.id, "payment.fault_selected", payment.request_id, { paymentId, mode });
       return { paymentId, faultMode: mode };
     }));
+  }
+
+
+  /** Bounded, scoped dashboard reads existing records; it never executes financial actions. */
+  async dashboard(principal: Principal) {
+    const catalog = await this.catalog(principal);
+    return transaction(this.db, principal.orgId, async tx => {
+      const rows = (await tx.query(`SELECT r.*,row_to_json(p) AS payment_row,row_to_json(a) AS approval_row
+        FROM requests r LEFT JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
+        LEFT JOIN approvals a ON a.org_id=r.org_id AND a.request_id=r.id
+        WHERE r.org_id=$1 AND r.project_id IN (SELECT project_id FROM principal_projects WHERE org_id=$1 AND principal_id=$2)
+        AND ($3<>'AGENT' OR r.agent_id IN (SELECT id FROM agents WHERE org_id=$1 AND owner_id=$2))
+        ORDER BY r.created_at DESC,r.id DESC LIMIT 50`, [principal.orgId, principal.id, principal.role])).rows;
+      const ids = rows.map(r => r.id);
+      const events = (await tx.query(`SELECT * FROM audit_events WHERE org_id=$1 AND packet->>'resourceId'=ANY($2::text[]) ORDER BY sequence DESC LIMIT 100`, [principal.orgId, ids])).rows;
+      return { catalog, requests: rows.map(r => projection(r, r.payment_row, r.approval_row)), events,
+        limits: { requests: 50, events: 100, exhaustive: false }, paymentExecution: false };
+    });
   }
 
   async catalog(principal: Principal) {

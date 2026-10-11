@@ -1,117 +1,64 @@
-# Gate integration flow
+# Gate: main dashboard integration
 
-## One authoritative workflow
+## Current product boundary
 
-The React frontend and DevRev Gatekeepers are separate clients of the same Gate
-backend. PostgreSQL owns identity, source evidence, policy snapshots, requests,
-consent, budget holds, payment jobs, receipts, and audit history. Neither client
-calculates an authoritative approval or executes a payment itself.
+Gate is an enterprise evaluation and authorization layer around existing financial
+records. It does not execute payments. The main frontend is the product interface;
+the backend console and separate /live workspace have been removed.
 
-1. An operator uses the frontend REST client, or a Gatekeeper uses the authenticated
-   MCP tools, to discover its scoped catalog and imported source context.
-2. The backend retrieves authorized source records and verified links. Agent text
-   and source instructions cannot grant authority or replace verified evidence.
-3. A proposal specifies an assigned agent, project, merchant, exact USD cents,
-   category, purpose, and exact source reference. An advisory preview moves no
-   money. Submission records the request under a retained idempotency key.
-4. The shared GateService evaluates policy, source coverage, configured limits,
-   and budget availability. Missing evidence waits; hard denials reject; eligible
-   purchases still await independent finance consent.
-5. A FINANCE principal retrieves a versioned, expiring preview through REST. The
-   frontend shows the exact amount, destination, hash, and required human review
-   resolutions. Finance approves or rejects with a reason. MCP exposes no finance
-   consent tool, and a DevRev conversation name cannot establish finance identity.
-6. Approval rechecks evidence/configuration/policy and atomically reserves budget
-   and queues execution. The worker consumes this durable job and uses the sandbox
-   provider. An unknown result retains the hold and reconciles the existing
-   operation rather than creating a replacement purchase.
-7. The frontend retrieves the authoritative result; the Gatekeeper can use
-   gate_get_request, gate_get_payment, and gate_explain_request to recover the same
-   result. Only actual completed state and the server receipt indicate sandbox
-   success. No real money moves in the current provider.
+React main dashboard → same-origin /v1 API → scoped PostgreSQL records.
+DevRev Gatekeepers → /mcp → the same policy, evidence, request and audit services.
 
-## Running the connected frontend
+DevRev adds enterprise context, but its installation does not wire the frontend.
+That frontend connection is now implemented independently. Approved source imports
+and current database records are usable while remote DevRev setup is pending.
 
-From the repository root run `./run-gate.sh`, then open the printed **Live
-frontend** URL (normally http://127.0.0.1:5173/live). The existing designed visual
-workspace remains a separate browser-local demo, with a link to the live workspace.
+## Main frontend
 
-The Vite development proxy forwards /v1, /health and /mcp to GATE_API_URL. The
-launcher sets that address to the actual backend port. The proxy changes the Host
-header to the backend host; exact browser Origin checks remain enforced. No
-credentials are injected into frontend bundles or proxy configuration.
+- Login uses a private local token during development or provisioned HTTPS human
+  sessions. Credentials/CSRF remain in memory; reload requires reconnect.
+- Catalog agents/merchants/projects/budgets, recent requests and audit events come
+  from /v1/dashboard and /v1/me. No browser fixture fallback is used.
+- Data is scoped and bounded: latest 50 requests and 100 associated audit events.
+  Metrics describe this loaded window and approved request values, not executed
+  spending. Merchant art/portraits are presentation assets, not financial facts.
+- Request forms choose an owned agent/assigned project and exact source returned
+  by authorized source search. USD is parsed into integer cents without rounding.
+- Evidence/policy detail shows real imported content, provenance hashes, missing
+  evidence, risk factors, version and current workflow/review state.
+- Finance opens an exact expiring backend preview, resolves required human review
+  items explicitly, enters a reason and records approval/rejection through /review.
+  The server revalidates identity, version, scope, evidence, configuration and limits.
+- Approval records an approval row, AUTHORIZED request and review.approved audit
+  event only. It creates no payments, authorizations tied to payments, jobs, budget
+  entries or reservations. The no-payment approval projection says REVIEWED.
+- Agent configuration and published policies are read-only because configuration
+  CRUD is not currently an API. Source data can be synthetic; connected does not
+  imply live DevRev evidence. Existing historical financial records are preserved.
 
-For a manual independent-identity test:
+## Running locally
 
-1. Open /live in an operator browser profile and a separate finance browser profile.
-   Enter the respective tokens from the ignored backend/work/demo-credentials.json
-   file. Credentials and action bindings stay in memory; reload requires reconnect.
-2. Operator selects an assigned agent and merchant, searches GATE-ISSUE-101,
-   selects that exact source, reads it, and proposes $1,700.00 diagnostics.
-3. Finance refreshes, opens that request, generates a consent preview, reads the
-   destination/evidence/rules, explicitly resolves review requirements and enters
-   a reason. Authorize the exact sandbox purchase.
-4. Refresh the outcome after the worker runs. Inspect completed status, captured
-   hold, receipt, spent/available balances and audit timeline.
-5. Repeating submission replays the same key. “Start a separate request” explicitly
-   starts a new logical purchase; recover uncertain previous submissions first.
+Run ./run-gate.sh at repository root and open its dashboard URL, normally
+http://127.0.0.1:5173. Connect independent operator/finance profiles using private
+backend/work/demo-credentials.json tokens. Operator submits a proposal using an
+assigned agent, merchant and GATE-ISSUE-101 source. Finance opens its detail and
+records an exact review. Refresh reads current database state. No worker runs.
 
-For frontend-only development, run `GATE_API_URL=http://127.0.0.1:8000 npm run dev`
-inside frontend, with the backend already running and that browser origin allowed.
-Production hosting must serve UI and /v1 under the same HTTPS origin (reverse proxy
-or hosting routing); the Vite dev proxy is not a production server. Provision human
-logins using the identity provisioning script and use cookie login plus in-memory
-CSRF. Local bearer entry is only the temporary test workflow.
+Vite proxies /v1, /health and /mcp to the actual launcher-selected GATE_API_URL.
+Hosting must provide equivalent same-origin HTTPS API routing; the development
+proxy is not part of the static frontend build. Backend session Host/Origin/CSRF
+checks remain intact.
 
-The live workspace supports catalog/budgets, source search/detail, proposal,
-request detail, pending finance review, exact consent, cancellation, reconciliation,
-audit and receipt reads. Configuration/policy editing is not an available API.
-Finance review opens the first pending item; the bounded queue and recent list do
-not claim to be complete history. UI uses backend permittedActions and backend
-checks remain authoritative.
+## Developer acceptance
 
-## Connecting the actual DevRev Gatekeepers
+backend/tests/live-frontend.test.ts uses private PostgreSQL/API/frontend ports and
+real browsers. It creates a request via actual MCP, reviews through the main
+frontend, and asserts zero payments/jobs/provider transactions/budget entries,
+unchanged reserved/spent balances, an actual audit event and scoped MCP recovery.
+It also loses a committed request response and proves retained-key browser retry
+creates exactly one record. Console routes are asserted unavailable.
 
-Use the **TypeScript backend /mcp endpoint**. Do not run the historical Python
-starter as a second Gate backend. It duplicates preview logic and uses conflicting
-port/tool names; it is retained only as historical reference.
-
-The existing backend/computer/capability-manifest.json and live authenticated tool
-discovery are the actual contract. The ten tools share the backend's services:
-capabilities, catalog, search_context, get_context, preview_spend, request_spend,
-list_requests, get_request, get_payment and explain_request, all prefixed gate_.
-
-Follow backend/computer/connector.md for provisioned Gate AGENT credentials,
-HTTPS deployment, exact Host/Origin configuration and SDK scenario checks. Agent
-credentials are distinct from DevRev PATs, human finance credentials and provider
-secrets. A shared DevRev connection is one service identity, not automatically
-one credential per chat user.
-
-Before remote integration is considered complete, supply/review the team's actual
-custom skill against these schemas, bind the authenticated HTTPS /mcp connection,
-and observe actual DevRev discovery/submission/recovery traces. Confirm the assigned
-organization's supported external MCP authentication rather than assuming that its
-outbound connection can use Gate bearer authentication. OAuth support is not
-implemented in Gate. If the platform requires OAuth, implement that transport
-contract before connecting; do not remove authentication to make discovery work.
-
-Gatekeeper-retrieved native DevRev text is currently not automatically ingested as
-trusted Gate evidence. Gate validates approved server imports. Actual remote source
-retrieval/import, provenance verification, per-project authorization and freshness
-must be implemented against the team's real source schema before claiming live
-DevRev evidence. Synthetic fixtures stay explicitly labeled SYNTHETIC_DEMO_DATA.
-
-## Verification and remaining boundaries
-
-`backend/tests/live-frontend.test.ts` provisions a private database and private
-API/frontend ports. It records a request via actual MCP SDK, consents via an
-independent finance browser, executes the worker, and recovers the captured receipt
-via MCP. It also loses a committed REST response and verifies browser retries do
-not create another request. It never resets the shared demo database.
-
-Frontend unit tests verify exact cents, retained mutation keys and CSRF handling.
-Existing backend suites cover scope, policy denials, stale consent, concurrency,
-provider uncertainty and accounting. This local proof does not prove DevRev
-registration, the actual custom skill, remote source access, hosted HTTPS sessions
-or external payment-provider integration. /v1/integrations keeps DevRev status
-NOT_CONFIGURED until real remote proof is implemented and recorded.
+Legacy payment tests exercise simulator/accounting components in isolation; that
+code is not connected to the default product launch or main-dashboard review.
+Remote DevRev/custom-skill, real external source import and hosted human-session
+acceptance remain separate integration gates. See computer/connector.md.

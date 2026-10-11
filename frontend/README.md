@@ -71,3 +71,12 @@ Validation: `npm run build`, `npm run test`, and `npm run test:browser -- tests/
 Ambient animation runs independently for each visible agent, with staggered first turns within one second and 3–4 seconds of rest between actions. Duplicate rows share an identity cooldown. Actions rotate through float, drift, tilt, breathe, nod, lean, glance, blink, wink and a relaxed both-eyes-closed pose. The relaxed pose closes over 140 ms, holds for one second, and reopens over 260 ms. Offscreen, paused and reduced-motion portraits stay still; preview controls remain available.
 
 Gaze now moves each white eye ring, its eyelid aperture and its pupil together, with up to 75 source-image units of horizontal travel including the delayed sway. The glasses character retains fixed frames and moves its pupils inside them.
+
+## Current dashboard connection
+
+The main dashboard now uses the PostgreSQL-backed REST adapter. The separate /live
+workspace is removed. Run ./run-gate.sh at the repo root, connect your private local
+identity in the main frontend, and inspect actual scoped requests/evidence/policies.
+Finance records enterprise-only reviews, with no payment or budget mutation.
+Legacy browser fixture workflows are historical; backend/tests/live-frontend.test.ts
+is the actual database-backed main-dashboard browser acceptance suite.

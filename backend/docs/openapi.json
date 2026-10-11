@@ -352,6 +352,94 @@
         ]
       }
     },
+    "/requests/{id}/review": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "enterpriseReview",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "browserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Consent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response; immutable action keys required on writes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ReviewResult"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "const": "sandbox"
+                        },
+                        "provider": {
+                          "const": "simulator"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Capability denied"
+          },
+          "409": {
+            "description": "Stale version, conflicting key or state"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/requests/{id}/consent": {
       "parameters": [
         {
@@ -1224,6 +1312,28 @@
           "approvalLimitMinor"
         ],
         "additionalProperties": {}
+      },
+      "ReviewResult": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "workflowStatus"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workflowStatus": {
+            "enum": [
+              "AUTHORIZED",
+              "REJECTED"
+            ]
+          },
+          "paymentExecution": {
+            "const": false
+          }
+        }
       },
       "ConsentResult": {
         "type": "object",

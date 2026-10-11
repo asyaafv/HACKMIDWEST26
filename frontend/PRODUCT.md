@@ -29,3 +29,12 @@ Reference screenshot and original logo PNG supplied in chat; ten original charac
 - Derive counts and activity from one shared state.
 - Persist only after storage succeeds; failures are visible.
 - Keep the demo boundary visible.
+
+## Updated scope: backend-connected main dashboard
+
+The earlier local-demo capabilities above are historical. The main dashboard now
+uses authenticated scoped PostgreSQL responses and has no fixture fallback.
+Unsupported agent/policy configuration writes are read-only. Finance review is a
+version-bound enterprise decision with no payment/job/budget reservation. The
+backend console and separate /live UI are removed. DevRev is an independent
+context-source integration, not a prerequisite for the main API adapter.
