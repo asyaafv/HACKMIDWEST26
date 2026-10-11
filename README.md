@@ -31,7 +31,9 @@ The dashboard reads stored `requests` with their linked `payments`, including
 historical payment details. A separate `transaction_reviews` row records approval
 or rejection, its reason and the reviewed snapshot; the original request status,
 payment status and budget balances are preserved. No payment worker is started.
-An empty database produces an empty dashboard; no sample transactions are invented.
+An empty database produces an empty dashboard. To create a labeled demo proposal,
+open Gatekeepers → Simulate purchase. It runs the real policy/evidence engine using
+imported sources; live DevRev investigation remains pending.
 
 Press Ctrl+C to stop services owned by the launcher. Existing history is preserved.
 Logs are in backend/work. `./run-gate.sh --smoke` verifies startup and then stops
