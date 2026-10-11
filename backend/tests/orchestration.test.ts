@@ -18,7 +18,7 @@ const requestId='9de772b5-4c6f-41b1-9510-46eb74ac28b9';
 const port=57000+process.pid%1000;
 const pg=new EmbeddedPostgres({databaseDir:`work/orchestration-test-${randomUUID()}`,user:'orchestration_test',password:'isolated_test_only',
  port,persistent:false,postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
-let admin:Pool,db:Pool,service:GateService,settings:OrchestrationSettings,p:Principal,token:string,initialDecision:any;
+let admin:Pool,db:Pool,service:GateService,settings:OrchestrationSettings,p:Principal,demoP:Principal,token:string,initialDecision:any;
 let calls:any[]=[],failTransport=false,releaseResponse:(()=>void)|undefined;
 const transport:typeof fetch=async(url,init)=>{
  if(String(url).endsWith('dev-users.self'))return new Response(JSON.stringify({dev_user:{id:`don:identity:dvrv-us-1:devo/${DEVREV_ORG}:devu/4`}}));
@@ -44,6 +44,7 @@ beforeAll(async()=>{
  token=controls.identities.OPERATOR!.token;
  const credential=(await admin.query('SELECT id FROM credentials WHERE principal_id=$1',[controls.identities.OPERATOR!.id])).rows[0].id;
  p={id:controls.identities.OPERATOR!.id,orgId:controls.orgId,credentialId:credential,role:'OPERATOR',approvalLimitMinor:'0',capabilities:['request:read']};
+ demoP={id:controls.identities.FINANCE!.id,orgId:controls.orgId,credentialId:'',role:'FINANCE',approvalLimitMinor:'500000',capabilities:['request:read','catalog:read','context:read','finance:consent']};
  const proposal={agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'100001',currency:'USD' as const,
   category:'diagnostics' as const,purpose:'Read-only orchestration fixture',source:{domain:'pm' as const,sourceId:'GATE-ISSUE-404'}};
  const decision=evaluate({proposal,agentActive:true,agentCapMinor:'500000',merchantStatus:'ALLOWED',budgetAvailableMinor:'2500000',dailyUsedMinor:'0',dailyCount:0,evidenceComplete:false,contradictoryEvidence:true});initialDecision=decision;
@@ -52,7 +53,8 @@ beforeAll(async()=>{
   {complete:false,items:[],links:[],missing:['GATE-ISSUE-404'],bundleHash:'fixture-only'},decision]);
  db=new Pool({connectionString,options:'-c role=gate_runtime'});service=new GateService(db);
  settings={enabled:true,apiToken:'fixture-only-token',gateOrgId:p.orgId,webhookId:`don:integration:dvrv-us-1:devo/${DEVREV_ORG}:webhook/fixture`,
-  webhookSecret:'fixture-only-secret-'.repeat(3),versions:AGENT_IDS.map((id,index)=>`${id}:ai_agent_version/${[4,7,8][index]}.1`) as [string,string,string],timeoutSeconds:300};
+  webhookSecret:'fixture-only-secret-'.repeat(3),versions:AGENT_IDS.map((id,index)=>`${id}:ai_agent_version/${[4,7,8][index]}.1`) as [string,string,string],timeoutSeconds:300,
+  demoReviewEnabled:false,demoPrincipalId:demoP.id};
 });
 beforeEach(async()=>{
  calls=[];failTransport=false;releaseResponse=undefined;
@@ -199,6 +201,51 @@ it('exposes exactly six read-only tools on the orchestration endpoint and preser
 it('requires three correctly associated version pins before enabling orchestration',()=>{
  expect(()=>configuration({DATABASE_URL:'postgresql://fixture/fixture',DEVREV_ORCHESTRATION_ENABLED:'true'})).toThrow();
  expect(configuration({DATABASE_URL:'postgresql://fixture/fixture'}).DEVREV_ORCHESTRATION_ENABLED).toBe(false);
+ expect(()=>configuration({DATABASE_URL:'postgresql://fixture/fixture',DEVREV_DEMO_REVIEW_ENABLED:'true'})).toThrow();
+});
+it('isolates the shared demo start route behind its server secret, rate limit and sandbox identity',async()=>{
+ const before=await financialState(),demoSettings={...settings,enabled:false,demoReviewEnabled:true},accessKey='fixture-demo-review-access-key-0123456789';
+ const app=createApp(db,{orchestration:demoSettings,demoWorkspace:{orgId:p.orgId,principalId:demoP.id},demoReview:{enabled:true,accessKey},
+  browserHosts:['gate.test'],origins:['https://demo.example']});
+ const headers={'content-type':'application/json',host:'gate.test',origin:'https://demo.example','sec-fetch-site':'same-origin',
+  'idempotency-key':randomUUID(),'x-gate-demo-review-key':accessKey};
+ try {
+  const missing=await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers:{...headers,'x-gate-demo-review-key':''},payload:{}});
+  expect(missing.statusCode,missing.body).toBe(401);
+  const attemptedApproval=await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers,payload:{choice:'approve'}});
+  expect(attemptedApproval.statusCode).toBe(400);
+  const unknownRequest=await app.inject({method:'POST',url:`/v1/demo/transactions/${randomUUID()}/orchestration`,headers:{...headers,'idempotency-key':randomUUID()},payload:{}});
+  expect(unknownRequest.statusCode).toBe(404);
+  expect(await financialState()).toEqual(before);
+ } finally {await app.close();}
+});
+it('starts only a demo-marked review while general orchestration stays disabled and limits duplicate requests',async()=>{
+ const before=await financialState(),demoSettings={...settings,enabled:false,demoReviewEnabled:true},accessKey='fixture-demo-review-access-key-0123456789',key=randomUUID();
+ const app=createApp(db,{orchestration:demoSettings,demoWorkspace:{orgId:p.orgId,principalId:demoP.id},demoReview:{enabled:true,accessKey},
+  browserHosts:['gate.test'],origins:['https://demo.example']});
+ const headers={'content-type':'application/json',host:'gate.test',origin:'https://demo.example','sec-fetch-site':'same-origin',
+  'idempotency-key':key,'x-gate-demo-review-key':accessKey};
+ try {
+  const started=await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers,payload:{}});
+  expect(started.statusCode,started.body).toBe(202);const id=started.json().data.runId;
+  expect(started.json().data).toMatchObject({financialApproval:false,paymentExecution:false});
+  const run=(await admin.query('SELECT * FROM orchestration_runs WHERE id=$1',[id])).rows[0];
+  expect(run).toMatchObject({status:'RUNNING',initiator_type:'DEMO_REVIEW',created_by:demoP.id,created_credential_id:null,idempotency_key:`demo:${key}`});
+  const replay=await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers,payload:{}});
+  expect(replay.statusCode).toBe(202);expect(replay.json().data.runId).toBe(id);
+  await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers:{...headers,'idempotency-key':randomUUID()},payload:{}});
+  const throttled=await app.inject({method:'POST',url:`/v1/demo/transactions/${requestId}/orchestration`,headers:{...headers,'idempotency-key':randomUUID()},payload:{}});
+  expect(throttled.statusCode).toBe(429);
+  const current=(await service.get(demoP,requestId));
+  expect(current.decision.agentReview).toMatchObject({status:'PENDING',runId:id});
+  expect((await financialState())).toEqual(before);
+  const demoCoordinator=new OrchestrationCoordinator(db,service,demoSettings,transport);
+  expect(await demoCoordinator.runOnce()).toBe(true);expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({agent:AGENT_IDS[0],agent_version:settings.versions[0]});
+  const state=await demoCoordinator.getDemo(demoP,id);
+  expect(state.stages[0]).toMatchObject({status:'WAITING',dispatch_confirmed:true});
+  expect(await financialState()).toEqual(before);
+ } finally {await app.close();}
 });
 it('serves scoped UI run discovery, authenticated readiness and read-only request validation without exposing secrets',async()=>{
  const id=await start(),app=createApp(db,{orchestration:settings});

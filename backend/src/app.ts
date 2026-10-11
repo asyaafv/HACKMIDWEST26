@@ -31,16 +31,17 @@ import type { OrchestrationSettings } from './orchestration-contracts.js';
 import { authenticatedWebhook,verificationChallenge } from './devrev-async.mjs';
 const ZodOrchestrationStart=z.object({requestId:z.string().uuid()}).strict();
 const ZodOrchestrationRecovery=z.object({acknowledgeReadOnlyReplay:z.literal(true)}).strict();
+const ZodDemoReviewStart=z.object({}).strict();
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean; orchestration?:OrchestrationSettings; orchestrationPolling?:boolean } = {}) {
-  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.body.password"], level: "info" } : false,
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; demoReview?:{enabled:boolean;accessKey:string}; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean; orchestration?:OrchestrationSettings; orchestrationPolling?:boolean } = {}) {
+  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.headers.x-gate-demo-review-key", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds,
     devrevOrchestrationEnabled:options.orchestration?.enabled});
   const investigations = new Investigations(db,service);
   const coordinator=options.orchestration?new OrchestrationCoordinator(db,service,options.orchestration):undefined;
   if(coordinator&&options.orchestration?.enabled)service.setAutomaticReviewStarter((orgId,requestId)=>coordinator.startAutomaticForRequest(orgId,requestId));
-  if(coordinator&&options.orchestrationPolling&&options.orchestration?.enabled) {
+  if(coordinator&&options.orchestrationPolling&&(options.orchestration?.enabled||options.orchestration?.demoReviewEnabled)) {
     let stopped=false,timer:ReturnType<typeof setTimeout>|undefined,inFlight:Promise<unknown>|undefined;
     const poll=()=>{inFlight=coordinator.runOnce().catch(()=>app.log.warn({code:'ORCHESTRATION_DEPENDENCY_UNAVAILABLE'},'Orchestration worker unavailable.'))
       .finally(()=>{if(!stopped){timer=setTimeout(poll,1000);timer.unref();}});};
@@ -62,7 +63,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     if (req.headers.origin) {
       requireThat(origins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "Origin not allowed.", 403);
       reply.header("Access-Control-Allow-Origin", req.headers.origin).header("Vary", "Origin");
-      reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-CSRF-Token");
+      reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-CSRF-Token, X-Gate-Demo-Review-Key");
       reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     }
     if (req.method === "OPTIONS") return reply.code(204).send();
@@ -125,6 +126,23 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       reply.header('Cache-Control','no-store');
       return {data:await service.validateDecision(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}};
     });
+    if(options.demoReview?.enabled&&coordinator) {
+      const requireDemoReviewKey=(req:any)=>requireThat(
+        authenticatedWebhook(req.headers['x-gate-demo-review-key'],options.demoReview!.accessKey),
+        'UNAUTHENTICATED','Valid demo review authentication required.',401);
+      demo.post('/transactions/:id/orchestration',{config:{rateLimit:{max:3,timeWindow:'10 minutes'}}},async (req,reply)=>{
+        requireDemoReviewKey(req);ZodDemoReviewStart.parse(req.body??{});
+        const identity=await demoPrincipal(db,options.demoWorkspace!);
+        const result=await coordinator.startDemo(identity,idSchema.parse((req.params as any).id),keySchema.parse(req.headers['idempotency-key']));
+        reply.code(202);
+        return {data:{...result,financialApproval:false,paymentExecution:false},meta:{traceId:req.id,mode:'sandbox',provider:'simulator'}};
+      });
+      demo.get('/orchestrations/:id',{config:{rateLimit:{max:30,timeWindow:'1 minute'}}},async req=>{
+        requireDemoReviewKey(req);
+        const identity=await demoPrincipal(db,options.demoWorkspace!);
+        return {data:await coordinator.getDemo(identity,idSchema.parse((req.params as any).id)),meta:{traceId:req.id,mode:'sandbox',provider:'simulator'}};
+      });
+    }
     demo.post('/transactions/:id/investigation', async req => ({data:await investigations.localRun(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
     demo.post('/transactions/:id/review', async req => {
       const p = await demoPrincipal(db, options.demoWorkspace!);

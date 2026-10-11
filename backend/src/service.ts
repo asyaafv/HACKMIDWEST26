@@ -98,8 +98,12 @@ export class GateService {
     requireThat(row&&['AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED'].includes(row.status), 'INVALID_STATE', 'Only a purchase without completed financial state can enter DevRev review.',409);
     requireThat(!(current?.status==='PENDING'&&current.runId&&current.runId!==runId),
       'DEVREV_REVIEW_ALREADY_RUNNING','A DevRev review is already attached to this purchase.',409);
-    requireThat(!(await tx.query('SELECT 1 FROM payments WHERE org_id=$1 AND request_id=$2',[p.orgId,row.id])).rowCount,
-      'FINANCIAL_STATE_EXISTS','A request with a payment cannot enter agent orchestration.',409);
+    const financialState=(await tx.query(`SELECT
+      EXISTS(SELECT 1 FROM payments WHERE org_id=$1 AND request_id=$2)
+      OR EXISTS(SELECT 1 FROM approvals WHERE org_id=$1 AND request_id=$2)
+      OR EXISTS(SELECT 1 FROM authorizations WHERE org_id=$1 AND request_id=$2) AS exists`,[p.orgId,row.id])).rows[0]?.exists;
+    requireThat(!financialState,
+      'FINANCIAL_STATE_EXISTS','A request with existing financial approval or payment state cannot enter agent orchestration.',409);
     requireThat(current?.status!=='COMPLETED','DEVREV_REVIEW_ALREADY_COMPLETE','This request already has a completed DevRev review.',409);
     const ctx=await context(tx,p,row.proposal,true);
     const base=await decisionFor(tx,p,row.proposal,ctx,row.evidence.complete,

@@ -8,6 +8,7 @@ export const AGENT_IDS=['4','7','8'].map(id=>`don:core:dvrv-us-1:devo/${DEVREV_O
 export interface OrchestrationSettings {
  enabled:boolean; apiToken:string; webhookId:string; webhookSecret:string; gateOrgId:string;
  versions:[string,string,string]; timeoutSeconds:number;
+ demoReviewEnabled?:boolean; demoPrincipalId?:string;
 }
 export const factsSchema=z.object({
  requestId:z.string().uuid(),version:z.number().int().positive(),workflowStatus:z.string().max(40),

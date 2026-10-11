@@ -66,12 +66,19 @@ export class OrchestrationCoordinator {
  async start(p:Principal,requestId:string,key:string,retryOf?:string) {
   this.access(p);keySchema.parse(key);
   requireThat(['OPERATOR','ADMIN'].includes(p.role),'FORBIDDEN','An operator must initiate advisory orchestration.',403);
-  requireThat(!key.startsWith('auto:'),'INVALID_IDEMPOTENCY_KEY','Automatic orchestration keys are reserved.',400);
-  return this.startRun(p,requestId,key,retryOf,false);
+  requireThat(!key.startsWith('auto:')&&!key.startsWith('demo:'),'INVALID_IDEMPOTENCY_KEY','Reserved orchestration keys cannot be used.',400);
+  return this.startRun(p,requestId,key,retryOf,false,'CREDENTIAL');
+ }
+ async startDemo(p:Principal,requestId:string,key:string) {
+  this.access(p);keySchema.parse(key);
+  requireThat(this.settings.demoReviewEnabled&&!this.settings.enabled&&p.id===this.settings.demoPrincipalId&&p.role==='FINANCE'&&p.credentialId==='',
+   'DEMO_REVIEW_FORBIDDEN','The configured shared demo identity is required.',403);
+  requireThat(!key.startsWith('auto:')&&!key.startsWith('demo:'),'INVALID_IDEMPOTENCY_KEY','Reserved orchestration keys cannot be used.',400);
+  return this.startRun(p,requestId,`demo:${key}`,undefined,false,'DEMO_REVIEW');
  }
  async startAutomatic(p:Principal,requestId:string) {
   this.access(p);requireThat(['OPERATOR','AGENT'].includes(p.role),'FORBIDDEN','Only the purchase owner may queue its automatic advisory review.',403);
-  return this.startRun(p,requestId,`auto:${requestId}`,undefined,true);
+  return this.startRun(p,requestId,`auto:${requestId}`,undefined,true,'CREDENTIAL');
  }
  async startAutomaticForRequest(orgId:string,requestId:string) {
   requireThat(orgId===this.settings.gateOrgId,'NOT_FOUND','Orchestration not available for this organization.',404);
@@ -104,8 +111,9 @@ export class OrchestrationCoordinator {
   await this.startAutomaticForRequest(this.settings.gateOrgId,candidate.id);
   return true;
  }
- private async startRun(p:Principal,requestId:string,key:string,retryOf:string|undefined,automatic:boolean) {
-  requireThat(this.settings.enabled,'ORCHESTRATION_DISABLED','Orchestration is disabled.',409);
+ private async startRun(p:Principal,requestId:string,key:string,retryOf:string|undefined,automatic:boolean,initiatorType:'CREDENTIAL'|'DEMO_REVIEW') {
+  requireThat(initiatorType==='DEMO_REVIEW'?this.settings.demoReviewEnabled:this.settings.enabled,
+   'ORCHESTRATION_DISABLED','Orchestration is disabled.',409);
   return transaction(this.db,p.orgId,async tx=>{
    const original=await requestRow(tx,p,requestId,true);
    if(automatic)requireThat(original.created_by===p.id,'FORBIDDEN','Automatic orchestration is restricted to the purchase owner.',403);
@@ -120,8 +128,9 @@ export class OrchestrationCoordinator {
    const id=randomUUID(),prepared=await this.service.prepareDevRevReview(tx,p,original,id);
    const snapshot=factsFromRequest({id:prepared.id,version:prepared.version,workflowStatus:prepared.status,decision:prepared.decision,
     evidence:prepared.evidence,consentStatus:'NONE',authorizationStatus:'NONE',payment:null,mode:'sandbox',provider:'simulator'});
-   await tx.query(`INSERT INTO orchestration_runs(id,org_id,request_id,created_by,idempotency_key,input_hash,snapshot,status,retry_of,created_credential_id)
-    VALUES($1,$2,$3,$4,$5,$6,$7,'RUNNING',$8,$9)`,[id,p.orgId,requestId,p.id,key,inputHash,snapshot,retryOf??null,p.credentialId]);
+   const credentialId=initiatorType==='CREDENTIAL'?p.credentialId:null;
+   await tx.query(`INSERT INTO orchestration_runs(id,org_id,request_id,created_by,idempotency_key,input_hash,snapshot,status,retry_of,created_credential_id,initiator_type)
+    VALUES($1,$2,$3,$4,$5,$6,$7,'RUNNING',$8,$9,$10)`,[id,p.orgId,requestId,p.id,key,inputHash,snapshot,retryOf??null,credentialId,initiatorType]);
    for(let index=0;index<3;index++) {
     const stageId=randomUUID();
     await tx.query(`INSERT INTO orchestration_stages(id,org_id,run_id,ordinal,agent_id,agent_version,session_object,status)
@@ -135,6 +144,19 @@ export class OrchestrationCoordinator {
   return transaction(this.db,p.orgId,async tx=>{
    const run=(await tx.query('SELECT * FROM orchestration_runs WHERE org_id=$1 AND id=$2',[p.orgId,id])).rows[0];
    requireThat(run,'NOT_FOUND','Orchestration not found.',404);await requestRow(tx,p,run.request_id);
+   const stages=(await tx.query('SELECT * FROM orchestration_stages WHERE org_id=$1 AND run_id=$2 ORDER BY ordinal',[p.orgId,id])).rows;
+   const events=(await tx.query(`SELECT e.* FROM orchestration_events e JOIN orchestration_stages s ON s.org_id=e.org_id AND s.id=e.stage_id
+    WHERE e.org_id=$1 AND s.run_id=$2 ORDER BY e.received_at,e.event_hash LIMIT 100`,[p.orgId,id])).rows;
+   return {run,stages,events,financialApproval:false};
+  });
+ }
+ async getDemo(p:Principal,id:string) {
+  this.access(p);
+  requireThat(this.settings.demoReviewEnabled&&!this.settings.enabled&&p.id===this.settings.demoPrincipalId&&p.role==='FINANCE'&&p.credentialId==='',
+   'DEMO_REVIEW_FORBIDDEN','The configured shared demo identity is required.',403);
+  return transaction(this.db,p.orgId,async tx=>{
+   const run=(await tx.query("SELECT * FROM orchestration_runs WHERE org_id=$1 AND id=$2 AND created_by=$3 AND initiator_type='DEMO_REVIEW'",[p.orgId,id,p.id])).rows[0];
+   requireThat(run,'NOT_FOUND','Demo orchestration not found.',404);await requestRow(tx,p,run.request_id);
    const stages=(await tx.query('SELECT * FROM orchestration_stages WHERE org_id=$1 AND run_id=$2 ORDER BY ordinal',[p.orgId,id])).rows;
    const events=(await tx.query(`SELECT e.* FROM orchestration_events e JOIN orchestration_stages s ON s.org_id=e.org_id AND s.id=e.stage_id
     WHERE e.org_id=$1 AND s.run_id=$2 ORDER BY e.received_at,e.event_hash LIMIT 100`,[p.orgId,id])).rows;
@@ -200,12 +222,13 @@ export class OrchestrationCoordinator {
   }
  }
  async runOnce() {
-  if(!this.settings.enabled)return false;
+  if(!this.settings.enabled&&!this.settings.demoReviewEnabled)return false;
   const orgId=this.settings.gateOrgId;
   const claimed=await transaction(this.db,orgId,async tx=>{
    const run=(await tx.query(`SELECT r.* FROM orchestration_runs r JOIN orchestration_stages s ON s.org_id=r.org_id AND s.run_id=r.id AND s.ordinal=r.current_stage
-    WHERE r.org_id=$1 AND r.status='RUNNING' AND (s.status='READY' OR (s.status IN ('SENDING','WAITING','DISPATCH_UNKNOWN') AND s.expires_at<=now()))
-    ORDER BY r.created_at,r.id FOR UPDATE OF r SKIP LOCKED LIMIT 1`,[orgId])).rows[0];
+    WHERE r.org_id=$1 AND r.status='RUNNING' AND ($2 OR r.initiator_type='DEMO_REVIEW')
+     AND (s.status='READY' OR (s.status IN ('SENDING','WAITING','DISPATCH_UNKNOWN') AND s.expires_at<=now()))
+    ORDER BY r.created_at,r.id FOR UPDATE OF r SKIP LOCKED LIMIT 1`,[orgId,this.settings.enabled])).rows[0];
    if(!run)return null;
    const stage=(await tx.query('SELECT * FROM orchestration_stages WHERE org_id=$1 AND run_id=$2 AND ordinal=$3 FOR UPDATE',[orgId,run.id,run.current_stage])).rows[0];
    // A joined eligibility snapshot can predate another worker's claim. Recheck
@@ -217,10 +240,15 @@ export class OrchestrationCoordinator {
    }
    const request=(await tx.query('SELECT version FROM requests WHERE org_id=$1 AND id=$2',[orgId,run.request_id])).rows[0];
    const allowed=(await tx.query(`SELECT 1 FROM principals p JOIN principal_projects pp ON pp.org_id=p.org_id AND pp.principal_id=p.id
-    JOIN requests r ON r.org_id=pp.org_id AND r.project_id=pp.project_id WHERE p.org_id=$1 AND p.id=$2 AND p.active
-    AND (p.role IN ('OPERATOR','ADMIN') OR (p.role='AGENT' AND r.id=$3 AND r.created_by=p.id
-      AND EXISTS(SELECT 1 FROM agents a WHERE a.org_id=r.org_id AND a.id=r.agent_id AND a.owner_id=p.id))) AND r.id=$3
-    AND 'request:read'=ANY(gate_credential_capabilities($4))`,[orgId,run.created_by,run.request_id,run.created_credential_id])).rowCount;
+    JOIN requests r ON r.org_id=pp.org_id AND r.project_id=pp.project_id WHERE p.org_id=$1 AND p.id=$2 AND p.active AND r.id=$3
+    AND NOT EXISTS(SELECT 1 FROM payments pay WHERE pay.org_id=r.org_id AND pay.request_id=r.id)
+    AND NOT EXISTS(SELECT 1 FROM approvals a WHERE a.org_id=r.org_id AND a.request_id=r.id)
+    AND NOT EXISTS(SELECT 1 FROM authorizations au WHERE au.org_id=r.org_id AND au.request_id=r.id)
+    AND (($5='CREDENTIAL' AND (p.role IN ('OPERATOR','ADMIN') OR (p.role='AGENT' AND r.created_by=p.id
+      AND EXISTS(SELECT 1 FROM agents a WHERE a.org_id=r.org_id AND a.id=r.agent_id AND a.owner_id=p.id)))
+      AND $4::uuid IS NOT NULL AND 'request:read'=ANY(gate_credential_capabilities($4::uuid)))
+     OR ($5='DEMO_REVIEW' AND $7::boolean AND p.role='FINANCE' AND p.id=$6 AND $4::uuid IS NULL))`,
+     [orgId,run.created_by,run.request_id,run.created_credential_id,run.initiator_type,this.settings.demoPrincipalId??'',!!this.settings.demoReviewEnabled])).rowCount;
    if(!allowed||request?.version!==run.snapshot.version){await this.fail(tx,run,stage,allowed?'STALE_REQUEST':'INITIATOR_ACCESS_REVOKED');return null;}
    const message=stageMessage(run,stage,await this.findings(tx,run)),promptHash=hash(message);
    const metadata={phase:'gate-orchestration-2',orgId,requestId:run.request_id,runId:run.id,stageId:stage.id,ordinal:stage.ordinal,promptHash};
@@ -229,7 +257,7 @@ export class OrchestrationCoordinator {
     WHERE org_id=$1 AND id=$2`,[orgId,stage.id,body,promptHash,this.settings.timeoutSeconds]);
    return {run,stage,body};
   });
-  if(!claimed)return this.queuePendingAutomatic();
+  if(!claimed)return this.settings.enabled?this.queuePendingAutomatic():false;
   try{await this.connectionReady(claimed.stage);}
   catch(error){
    await transaction(this.db,orgId,async tx=>{
