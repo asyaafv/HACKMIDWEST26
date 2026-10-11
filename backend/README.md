@@ -1,3 +1,14 @@
+# Gate backend: current enterprise scope
+
+The backend console is removed. Run `./run-gate.sh` at the repository root and
+use the main frontend. Dashboard reads use `/v1/dashboard`; finance decisions use
+`/v1/requests/:id/review` with exact preview bindings. Reviews create no payments,
+jobs or budget reservations. The launcher starts no worker. Legacy simulator
+components remain for regression tests and existing history.
+
+See [current integration flow](docs/integration-flow.md). The old console/worker
+walkthrough below is historical acceptance documentation, not the active setup.
+
 # Gate backend
 
 Gate validates fictional synthetic incident context and deterministic spending controls, then holds budget and executes a durable sandbox transaction after independent finance consent. Gatekeepers use the scoped MCP interface. Every receipt is simulated; no money moves.

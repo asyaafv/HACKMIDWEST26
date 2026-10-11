@@ -40,16 +40,14 @@ export async function freePort(preferred) {
   throw new Error(`No free local port near ${preferred}.`);
 }
 
-export async function gateApiReady(base, requireConsole = true) {
+export async function gateApiReady(base, origin) {
   try {
-    const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500) });
-    if (!health.ok || (await health.json()).service !== 'gate-backend') return false;
+    const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500), ...(origin ? {headers:{Origin:origin}} : {}) });
+    if (!health.ok) return false;
+    const identity = await health.json();
+    if (identity.service !== 'gate-backend' || identity.dashboard !== true || identity.paymentExecution !== false) return false;
     const ready = await fetch(`${base}/health/ready`, { signal: AbortSignal.timeout(1500) });
     if (!ready.ok) return false;
-    if (requireConsole) {
-      const consoleResponse = await fetch(`${base}/dev-console`, { signal: AbortSignal.timeout(1500) });
-      if (!consoleResponse.ok || !/Gate/i.test(await consoleResponse.text())) return false;
-    }
     return true;
   } catch { return false; }
 }
@@ -207,27 +205,28 @@ async function main() {
 
     const preferredApi = parsePort(process.env.GATE_API_PORT ?? process.env.PORT, 8000);
     let apiPort = preferredApi;
-    const existingApi = await gateApiReady(`http://127.0.0.1:${apiPort}`);
+    let existingApi = await gateApiReady(`http://127.0.0.1:${apiPort}`);
     if (!existingApi) apiPort = await freePort(preferredApi);
     const frontendPort = await freePort(parsePort(process.env.GATE_FRONTEND_PORT, 5173));
-    const apiUrl = `http://127.0.0.1:${apiPort}`;
     const frontendUrl = `http://127.0.0.1:${frontendPort}`;
-    const serviceEnv = { ...baseEnv, PORT: String(apiPort), DEV_CONSOLE: 'true', GATE_API_URL: apiUrl,
+    if (existingApi && !await gateApiReady(`http://127.0.0.1:${apiPort}`, frontendUrl)) {
+      existingApi = false; apiPort = await freePort(preferredApi);
+    }
+    const apiUrl = `http://127.0.0.1:${apiPort}`;
+    const serviceEnv = { ...baseEnv, PORT: String(apiPort), GATE_API_URL: apiUrl,
       ALLOWED_ORIGINS: [...new Set([apiUrl, frontendUrl, `http://localhost:${apiPort}`, `http://localhost:${frontendPort}`, ...String(baseEnv.ALLOWED_ORIGINS ?? '').split(',').filter(Boolean)])].join(','),
       BROWSER_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}`,
       MCP_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}` };
-    if (existingApi) console.log('[Gate] Reusing the existing healthy Gate API and console.');
+    if (existingApi) console.log('[Gate] Reusing the existing healthy Gate API.');
     else await supervisor.start('api', ['run', 'dev'], backend, serviceEnv);
-    await supervisor.waitFor(() => gateApiReady(apiUrl), 'Gate API and console');
-    await supervisor.start('worker', ['run', 'worker'], backend, serviceEnv);
+    await supervisor.waitFor(() => gateApiReady(apiUrl), 'Gate API');
     await supervisor.start('frontend', ['run', 'dev', '--', '--port', String(frontendPort), '--strictPort'], frontend, serviceEnv);
     await supervisor.waitFor(async () => {
       try { const response = await fetch(frontendUrl, { signal: AbortSignal.timeout(1500) }); return response.ok && /Gate/.test(await response.text()); } catch { return false; }
     }, 'frontend');
     await sleep(750);
     if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);
-    if (/dependency failure/i.test(await readFile(resolve(work, 'worker.log'), 'utf8'))) throw new Error(`Worker could not access its dependencies. See ${resolve(work, 'worker.log')}`);
-    console.log(`\nGate is ready.\n  Backend test console: ${apiUrl}/dev-console\n  Live frontend: ${frontendUrl}/live\n  Visual demo: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Private demo tokens: ${resolve(work, 'demo-credentials.json')}\n  Service logs: ${work}\n\nUse the live frontend or backend console to test actual approvals/payments. The visual demo remains separate.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
+    console.log(`\nGate is ready.\n  Gate dashboard: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Private demo tokens: ${resolve(work, 'demo-credentials.json')}\n  Service logs: ${work}\n\nThe dashboard reads PostgreSQL records and records enterprise reviews. No payment worker is started.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
     if (args.has('--smoke')) { console.log('[Gate] Startup smoke check passed. Stopping owned services.'); return; }
     while (!stopRequested) {
       if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);

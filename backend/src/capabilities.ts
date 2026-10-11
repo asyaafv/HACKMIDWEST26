@@ -20,7 +20,8 @@ export function capabilityAccess(principal: ScopedPrincipal, capability: string)
  if (capability === 'finance:consent') requireThat(principal.role === 'FINANCE', 'FORBIDDEN', 'Independent finance identity required.', 403);
 }
 export function enforceHttpCapability(principal: ScopedPrincipal, method: string, route: string) {
- const capability = route.endsWith('/me') ? undefined : route.endsWith('/reconcile') ? 'payment:reconcile' : route.endsWith('/fault') ? 'development:fault' : route.includes('/consent') || /\/requests\/[^/]+\/preview$/.test(route) ? 'finance:consent'
+ if (route.endsWith('/dashboard')) capabilityAccess(principal, 'catalog:read');
+ const capability = route.endsWith('/me') ? undefined : route.endsWith('/reconcile') ? 'payment:reconcile' : route.endsWith('/fault') ? 'development:fault' : route.includes('/consent') || route.endsWith('/review') || /\/requests\/[^/]+\/preview$/.test(route) ? 'finance:consent'
  : route.endsWith('/cancel') ? 'request:cancel' : route.includes('/policy/preview') ? 'request:preview'
  : route.endsWith('/requests') && method === 'POST' ? 'request:submit' : route.includes('/sources') ? 'context:read'
  : route.includes('/payments') ? 'payment:read' : route.includes('/catalog') ? 'catalog:read' : 'request:read';
