@@ -14,9 +14,9 @@ function input(amount = "50000"): PolicyInput {
 }
 describe("deterministic policy", () => {
   it("reviews one cent above the automatic threshold", () => {
-    expect(evaluate(input("50000")).verdict).toBe("APPROVE");
-    expect(evaluate(input("50001")).verdict).toBe("REVIEW");
-    expect(evaluate(input()).requiresHumanConsent).toBe(true);
+    expect(evaluate(input("100000")).verdict).toBe("APPROVE");
+    expect(evaluate(input("100001")).verdict).toBe("REVIEW");
+    expect(evaluate(input()).requiresHumanConsent).toBe(false);
   });
   it("denies one cent above the agent cap regardless of low risk", () => {
     expect(evaluate(input("500000")).verdict).toBe("REVIEW");

@@ -10,7 +10,7 @@ export const RISK_ALGORITHM = Object.freeze({
     budgetPressure: 20, dailyPressure: 25 }),
 });
 export const POLICY = Object.freeze({
-  version: "gate-policy-v2", automaticMaxMinor: "50000", dailyMaxMinor: "1000000",
+  version: "gate-policy-v3", automaticMaxMinor: "100000", dailyMaxMinor: "1000000",
   dailyMaxRequests: 10, reviewScoreThreshold: 40, ttlSeconds: 300,
   riskAlgorithm: RISK_ALGORITHM,
 });
@@ -75,7 +75,7 @@ export function evaluate(input: PolicyInput) {
     verdict: denied ? "REJECT" as const : reviews.length ? "REVIEW" as const : "APPROVE" as const,
     riskScore, riskAlgorithm: RISK_ALGORITHM.name, factors, rules, reviewRequirements: reviews,
     executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence,
-    requiresHumanConsent: true as const, policyVersion: POLICY.version,
+    requiresHumanConsent: !denied && reviews.some(r => r.resolution === "HUMAN_JUDGMENT"), policyVersion: POLICY.version,
     policyHash: hash(POLICY), inputHash: hash(input),
   };
 }

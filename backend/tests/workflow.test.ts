@@ -60,9 +60,9 @@ describe("Gate sandbox workflow", () => {
     expect(result).toMatchObject({ workflowStatus: "AWAITING_CONSENT", decision: { verdict: "REVIEW", requiresHumanConsent: true }, evidence: { complete: true } });
     expect((await admin.query("SELECT count(*) FROM payments")).rows[0].count).toBe("0");
   });
-  it("runs eligible low-value requests through human consent too", async () => {
+  it("automatically authorizes eligible low-value requests", async () => {
     proposal.amountMinor = "20000";
-    const { request } = await approved(); await new GateWorker(runtime).runOnce();
+    const request = await service.create(operator, proposal, randomUUID()); await new GateWorker(runtime).runOnce();
     expect(await service.get(operator, request.id)).toMatchObject({ workflowStatus: "COMPLETED", decision: { verdict: "APPROVE" }, payment: { status: "SUCCEEDED" } });
   });
   it("denies requests above cap and refuses preview", async () => {
