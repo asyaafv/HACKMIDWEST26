@@ -10,7 +10,14 @@ export async function migrate(db: InstanceType<typeof Pool>) {
     await tx.query("BEGIN");
     await tx.query("SELECT pg_advisory_xact_lock(87492301)");
     await tx.query("CREATE TABLE IF NOT EXISTS gate_migrations(name text PRIMARY KEY, checksum text NOT NULL)");
-    const directory = new URL("../migrations/", import.meta.url);
+    // Source runs from scripts/, compiled output runs from dist/scripts/.
+    const sourceDirectory = new URL("../migrations/", import.meta.url);
+    let directory = sourceDirectory;
+    try { await readdir(directory); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      directory = new URL("../../migrations/", import.meta.url);
+    }
     for (const name of (await readdir(directory)).filter(n => n.endsWith(".sql")).sort()) {
       const sql = await readFile(new URL(name, directory), "utf8");
       const checksum = secretHash(sql);
