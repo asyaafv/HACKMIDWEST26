@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { connectFixture } from './backend-fixture';
 test('database-backed empty state and read-only configuration replace the old demo',async({page})=>{
  await connectFixture(page,'/transactions',false);await expect(page.getByRole('heading',{name:'Authorization queue'})).toBeVisible();
- await expect(page.getByRole('heading',{name:'No transactions yet'})).toBeVisible();await expect(page.getByText('CONNECTED',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'No matching transactions'})).toBeVisible();await expect(page.locator('.topbar')).not.toContainText(/Refresh|Disconnect|CONNECTED/);
  await page.getByRole('link',{name:'Gatekeepers',exact:true}).click();await expect(page.getByRole('button',{name:'Create Gatekeeper',exact:true})).toBeDisabled();
  await page.getByRole('link',{name:'Policies',exact:true}).click();await expect(page.getByText('VISUAL_TEST_ONLY')).toBeVisible();await expect(page.getByRole('button',{name:'Save policy'})).toHaveCount(0);
 });

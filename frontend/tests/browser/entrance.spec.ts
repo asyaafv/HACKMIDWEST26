@@ -52,10 +52,38 @@ test('skip, keyboard containment, direct routes, and history restoration', async
   await expect(page).toHaveURL(/transactions/);
 });
 
+for (const mobile of [false, true]) {
+  test(`brand replays the full intro repeatedly${mobile ? ' on mobile' : ' on desktop'}`, async ({ page }) => {
+    const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+    await mockBackend(page);
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await freeze(page); await page.goto('/gatekeepers'); await scene(page);
+    await page.keyboard.press('Escape'); await released(page);
+    await connectExistingFixture(page);
+    const brand = page.getByRole('link', { name: 'Gate home and replay intro', exact: true });
+    for (const keyboard of [false, true]) {
+      if (mobile) await page.getByRole('button', { name: 'Open navigation' }).click();
+      if (keyboard) { await brand.focus(); await page.keyboard.press('Enter'); }
+      else await brand.locator('img').click();
+      await scene(page);
+      await expect(page).toHaveURL(/overview/);
+      await expect(page.getByRole('button', { name: 'Skip intro' })).toBeFocused();
+      expect(await page.locator('.entrance-workspace').evaluate(e => (e as HTMLElement).inert)).toBe(true);
+      await page.clock.fastForward(3250);
+      await expect(page.locator('.gate-entrance')).toHaveAttribute('data-phase', 'approved');
+      await page.clock.fastForward(2550); await released(page);
+    }
+    expect(errors).toEqual([]);
+  });
+}
+
 test('reduced motion uses a brief static welcome and does not load WebGL', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await freeze(page); await page.goto('/');
   await expect(page.locator('.gate-entrance')).toHaveAttribute('data-mode', 'reduced');
   await expect(page.locator('.entrance-static')).toBeVisible();
+  await page.clock.fastForward(750); await released(page);
+  await page.getByRole('link', { name: 'Gate home and replay intro', exact: true }).click();
+  await expect(page.locator('.gate-entrance')).toHaveAttribute('data-mode', 'reduced');
   await page.clock.fastForward(750); await released(page);
 });
 
