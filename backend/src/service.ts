@@ -41,12 +41,15 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
     JOIN requests r ON r.org_id=p.org_id AND r.id=p.request_id
     WHERE p.org_id=$1 AND r.agent_id=$2 AND p.created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
     AND p.hold_state IN ('HELD','CAPTURED')`, [principal.orgId, proposal.agentId])).rows[0];
-  // This fingerprint compares business intent across distinct requests, independent of transport keys.
-  const duplicate = (await tx.query(`SELECT 1 FROM requests r LEFT JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
-    WHERE r.org_id=$1 AND r.agent_id=$2 AND r.merchant_id=$3 AND r.amount_minor=$4
-      AND r.proposal->'source'=$5::jsonb AND r.id<>COALESCE($6::uuid,'00000000-0000-0000-0000-000000000000'::uuid)
-      AND r.created_at>=now()-interval '10 minutes' AND (p.status IN ('QUEUED','PROCESSING','UNKNOWN','SUCCEEDED') OR (r.status='AUTHORIZED' AND EXISTS (SELECT 1 FROM approvals a WHERE a.org_id=r.org_id AND a.request_id=r.id AND a.choice='approve'))) LIMIT 1`,
-    [principal.orgId, proposal.agentId, proposal.merchantId, proposal.amountMinor, proposal.source, excludeRequestId??null])).rows.length > 0;
+  // A recorded proposal is enough to flag a second matching intent; payment is not required.
+  const duplicate = (await tx.query(`SELECT 1 FROM requests r
+    WHERE r.org_id=$1 AND r.agent_id=$2 AND r.project_id=$3 AND r.merchant_id=$4 AND r.amount_minor=$5
+      AND r.proposal->'source'=$6::jsonb AND r.proposal->>'category'=$7
+      AND lower(trim(r.proposal->>'purpose'))=lower(trim($8::text))
+      AND r.id<>COALESCE($9::uuid,'00000000-0000-0000-0000-000000000000'::uuid)
+      AND r.created_at>=now()-interval '10 minutes' LIMIT 1`,
+    [principal.orgId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor,
+      proposal.source, proposal.category, proposal.purpose, excludeRequestId??null])).rows.length > 0;
   return evaluate({ duplicateIntent: duplicate, contradictoryEvidence, proposal, agentActive: ctx.agent.active, agentCapMinor: ctx.agent.cap_minor,
     merchantStatus: ctx.merchant.status,
     budgetAvailableMinor: (BigInt(ctx.budget.limit_minor) - BigInt(ctx.budget.spent_minor) - BigInt(ctx.budget.reserved_minor)).toString(),
@@ -114,6 +117,38 @@ export class GateService {
     });
   }
 
+  /** Read-only validation reruns the authoritative policy without replacing the archived decision. */
+  async validateDecision(principal: Principal, id: string) {
+    return transaction(this.db, principal.orgId, async tx => {
+      const row = await requestRow(tx, principal, id);
+      const fresh = await collectEvidence(tx, principal, row.proposal);
+      const questions: string[] = row.evidence.investigation?.report?.unresolvedQuestions ?? [];
+      const evidence = { ...fresh, complete: fresh.complete && questions.length === 0 };
+      const ctx = await context(tx, principal, row.proposal);
+      const decision = await decisionFor(tx, principal, row.proposal, ctx, evidence.complete,
+        fresh.unresolvedRequirements.some((r: string) => r.startsWith("CONTRADICTORY_FACT")), row.id);
+      const evidenceContent = (value: any) => ({ items: value.items, links: value.links, missing: value.missing,
+        unresolvedRequirements: value.unresolvedRequirements?.filter((r: string) => !r.startsWith("GATEKEEPER_QUESTION_")),
+        coverage: value.coverage, referenceTime: value.referenceTime });
+      const evidenceMatches = hash(evidenceContent(row.evidence)) === hash(evidenceContent(fresh));
+      const findings = (value: any) => ({ verdict: value.verdict, riskScore: value.riskScore, factors: value.factors,
+        rules: value.rules, reviewRequirements: value.reviewRequirements, executionAllowed: value.executionAllowed });
+      const decisionMatches = hash(findings(row.decision)) === hash(findings(decision));
+      const policyMatches = row.decision.policyHash === decision.policyHash;
+      const reasons = [
+        ...(!evidenceMatches ? ["EVIDENCE_CHANGED"] : []),
+        ...(!policyMatches ? ["POLICY_CHANGED"] : []),
+        ...(!decisionMatches ? ["POLICY_FINDINGS_CHANGED"] : []),
+      ];
+      return { requestId: id, requestVersion: row.version, checkedAt: new Date().toISOString(),
+        status: reasons.length ? "CHANGED" as const : "VALID" as const, reasons,
+        evidenceMatches, decisionMatches, policyMatches, storedDecision: row.decision, decision,
+        evidence: { complete: evidence.complete, sourceCount: fresh.items.length,
+          unresolvedRequirements: [...fresh.unresolvedRequirements, ...questions] },
+        policy: POLICY, advisory: true, paymentExecution: false };
+    });
+  }
+
   async create(principal: Principal, input: unknown, key: string, origin: "REQUEST" | "SIMULATED_PURCHASE" = "REQUEST") {
     roleAccess(principal, ["OPERATOR", "AGENT"]);
     const proposal = proposalSchema.parse(input);
@@ -143,7 +178,7 @@ export class GateService {
       const row = await requestRow(tx, principal, id, true);
       requireThat(row.status === "AWAITING_CONSENT", "INVALID_STATE", "This request cannot be authorized.", 409);
       const ctx = await context(tx, principal, row.proposal);
-      const current = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
+      const current = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
       const version = row.version + 1;
       const expiresAt = new Date(Date.now() + POLICY.ttlSeconds * 1000).toISOString();
       const payload = { requestId: id, requestVersion: version, proposal: row.proposal, evidenceHash: row.evidence.bundleHash,
@@ -174,7 +209,7 @@ export class GateService {
         requireThat(BigInt(row.amount_minor) <= BigInt(principal.approvalLimitMinor), "APPROVAL_LIMIT", "Amount exceeds your approval authority.", 403);
         const currentEvidence = await collectEvidence(tx, principal, row.proposal);
         requireThat(currentEvidence.bundleHash === row.evidence.bundleHash, "STALE_EVIDENCE", "Source evidence changed. Submit a new reviewed request.", 409);
-        const live = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
+        const live = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
         requireThat(live.executionAllowed, "POLICY_BLOCKED", "Current policy or required evidence prevents execution.");
         requireThat(preview.payload.policyHash === hash(POLICY) && preview.payload.agentVersion === ctx.agent.version && preview.payload.merchantVersion === ctx.merchant.version && preview.payload.destinationRef === ctx.merchant.destination_ref,
           "STALE_PREVIEW", "Configuration changed. Review a new preview.", 409);

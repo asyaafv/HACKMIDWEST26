@@ -51,6 +51,26 @@ it('queues a proposal, denies premature review, and completes a real scoped MCP 
  expect(result.evidence.complete).toBe(true);await review(request.id,'approve');
  for(const table of ['payments','jobs','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
 });
+it('returns a low-risk backend decision through MCP and validates it without changing the request',async()=>{
+ const request=await service.create(buyer,{...proposal(),amountMinor:'12001',purpose:'Low risk MCP decision acceptance'},randomUUID());
+ const started=await client.callTool({name:'gate_start_investigation',arguments:{request_id:request.id,expectedVersion:1,idempotency_key:randomUUID()}});
+ const inv=(started.structuredContent as any).data;
+ const submitted=await client.callTool({name:'gate_submit_evidence',arguments:{request_id:request.id,expectedVersion:1,runId:inv.run_id,report:await reportFor(request.id),idempotency_key:randomUUID()}});
+ expect(submitted.isError).not.toBe(true);
+ expect((submitted.structuredContent as any).data.decision).toMatchObject({verdict:'APPROVE',riskScore:0,riskAssessment:{level:'LOW',lowRisk:true,computedBy:'BACKEND_POLICY'}});
+ const validated=await client.callTool({name:'gate_get_request',arguments:{request_id:request.id,validate_decision:true}});
+ expect(validated.isError).not.toBe(true);
+ expect((validated.structuredContent as any).data.validation).toMatchObject({status:'VALID',requestVersion:2,decision:{verdict:'APPROVE',riskScore:0},paymentExecution:false});
+ const before=await service.get(finance,request.id);
+ await admin.query('UPDATE budgets SET limit_minor=1 WHERE org_id=$1',[controls.orgId]);
+ try {
+  const validation=await service.validateDecision(finance,request.id);
+  expect(validation).toMatchObject({status:'CHANGED',decision:{verdict:'REJECT',riskAssessment:{lowRisk:false,level:'BLOCKED'}}});
+  expect(validation.reasons).toContain('POLICY_FINDINGS_CHANGED');
+  expect(await service.get(finance,request.id)).toEqual(before);
+ } finally {await admin.query('UPDATE budgets SET limit_minor=1000000 WHERE org_id=$1',[controls.orgId]);}
+ for(const table of ['payments','jobs','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
+});
 it('serializes competing claims, retains same-key replay, and fences expired runs',async()=>{
  const request=await create(),key=randomUUID();
  const [one,replay]=await Promise.all([flow.start(keeper,request.id,{expectedVersion:1},key),flow.start(keeper,request.id,{expectedVersion:1},key)]);expect(replay.run_id).toBe(one.run_id);
@@ -84,6 +104,7 @@ it('denies purchasing identities and out-of-scope investigators',async()=>{
  const projectId=randomUUID();await admin.query("INSERT INTO projects VALUES($1,$2,'Restricted investigator project')",[projectId,controls.orgId]);
  const outsider=await provisionGatekeeper(admin,{orgId:controls.orgId,projectId,name:'Restricted keeper',investigator:true}),p=await authenticate(runtime,`Bearer ${outsider.token}`);
  expect((await flow.list(p)).items).toHaveLength(0);await expect(flow.start(p,request.id,{expectedVersion:1},randomUUID())).rejects.toMatchObject({code:'NOT_FOUND'});
+ await expect(service.validateDecision(p,request.id)).rejects.toMatchObject({code:'NOT_FOUND'});
 });
 it('records local failure honestly and permits a fresh retry after source recovery',async()=>{
  const request=await create();await admin.query("UPDATE source_records SET source_id='TEMPORARILY_UNAVAILABLE' WHERE org_id=$1 AND source_id='GATE-ISSUE-101'",[controls.orgId]);
@@ -99,6 +120,9 @@ it('rejects a changed source revision and archives fresh content after refetch',
  const original=(await admin.query("SELECT content FROM source_records WHERE org_id=$1 AND source_id='GATE-ISSUE-101'",[controls.orgId])).rows[0].content;
  try{
   await admin.query("UPDATE source_records SET content=content||'{\"updatedForInvestigation\":true}'::jsonb WHERE org_id=$1 AND source_id='GATE-ISSUE-101'",[controls.orgId]);
+  const validation=await service.validateDecision(finance,request.id);
+  expect(validation.status).toBe('CHANGED');expect(validation.reasons).toContain('EVIDENCE_CHANGED');
+  expect((await service.get(finance,request.id)).version).toBe(1);
   await expect(flow.submit(keeper,request.id,{expectedVersion:1,runId:inv.run_id,report:oldReport},randomUUID())).rejects.toMatchObject({code:'STALE_SOURCE'});
   await flow.submit(keeper,request.id,{expectedVersion:1,runId:inv.run_id,report:await reportFor(request.id)},randomUUID());
   const revisions=(await admin.query('SELECT evidence FROM request_revisions WHERE request_id=$1 ORDER BY revision',[request.id])).rows;

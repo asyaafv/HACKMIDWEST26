@@ -5,6 +5,17 @@ import { hash } from "./hash.js";
 export const POLICY = Object.freeze({
   version: "gate-policy-v1", automaticMaxMinor: "50000", dailyMaxMinor: "1000000",
   dailyMaxRequests: 10, reviewScoreThreshold: 40, ttlSeconds: 300,
+  riskModel: {
+    version: "gate-risk-v1", scoreType: "RULE_POINTS" as const, maximum: 100, largeAmountMinor: "200000",
+    factors: {
+      amount: { label: "Amount above automatic review limit", points: 20 },
+      largeAmount: { label: "Amount above large purchase limit", points: 35 },
+      merchant: { label: "Merchant requires review", points: 25 },
+      missingEvidence: { label: "Required evidence missing", points: 30 },
+      duplicate: { label: "Duplicate business intent", points: 20 },
+      contradiction: { label: "Contradictory evidence", points: 35 },
+    },
+  },
 });
 export interface PolicyInput {
   proposal: Proposal;
@@ -33,32 +44,41 @@ export function evaluate(input: PolicyInput) {
   hard("DAILY_COUNT_CAP", input.dailyCount < POLICY.dailyMaxRequests);
   if (amount > BigInt(POLICY.automaticMaxMinor)) {
     reviews.push({ code: "AMOUNT_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "AMOUNT", points: amount > 200000n ? 35 : 20 });
+    factors.push({ code: "AMOUNT", points: amount > BigInt(POLICY.riskModel.largeAmountMinor) ? POLICY.riskModel.factors.largeAmount.points : POLICY.riskModel.factors.amount.points });
   }
   if (input.merchantStatus === "REVIEW") {
     reviews.push({ code: "MERCHANT_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "MERCHANT", points: 25 });
+    factors.push({ code: "MERCHANT", points: POLICY.riskModel.factors.merchant.points });
   }
   if (!input.evidenceComplete) {
     reviews.push({ code: "REQUIRED_EVIDENCE_MISSING", resolution: "NEW_EVIDENCE" });
-    factors.push({ code: "EVIDENCE", points: 30 });
+    factors.push({ code: "EVIDENCE", points: POLICY.riskModel.factors.missingEvidence.points });
   }
   if (input.duplicateIntent) {
     reviews.push({ code: "DUPLICATE_BUSINESS_INTENT", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "DUPLICATE_INTENT", points: 20 });
+    factors.push({ code: "DUPLICATE_INTENT", points: POLICY.riskModel.factors.duplicate.points });
   }
   if (input.contradictoryEvidence) {
     reviews.push({ code: "CONTRADICTORY_REQUIRED_EVIDENCE", resolution: "NEW_EVIDENCE" });
-    factors.push({ code: "CONTRADICTION", points: 35 });
+    factors.push({ code: "CONTRADICTION", points: POLICY.riskModel.factors.contradiction.points });
   }
-  const riskScore = Math.min(100, factors.reduce((sum, factor) => sum + factor.points, 0));
+  const riskScore = Math.min(POLICY.riskModel.maximum, factors.reduce((sum, factor) => sum + factor.points, 0));
   if (riskScore >= POLICY.reviewScoreThreshold && !reviews.some(r => r.resolution === "NEW_EVIDENCE")) {
     reviews.push({ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
   }
   const denied = rules.some(r => r.result === "FAIL");
+  const verdict = denied ? "REJECT" as const : reviews.length ? "REVIEW" as const : "APPROVE" as const;
+  const riskAssessment = {
+    computedBy: "BACKEND_POLICY" as const, modelVersion: POLICY.riskModel.version,
+    scoreType: POLICY.riskModel.scoreType, score: riskScore, maximum: POLICY.riskModel.maximum,
+    reviewThreshold: POLICY.reviewScoreThreshold,
+    level: denied ? "BLOCKED" as const : reviews.length ? "REVIEW_REQUIRED" as const : "LOW" as const,
+    lowRisk: verdict === "APPROVE",
+    summary: denied ? "Rejected by a hard policy rule." : reviews.length ? "Review required: " + reviews.map(r => r.code.replaceAll("_", " ").toLowerCase()).join(", ") + "."
+      : "Low risk: all policy checks pass and required evidence is complete. Approval recommended; human consent is still required.",
+  };
   return {
-    verdict: denied ? "REJECT" as const : reviews.length ? "REVIEW" as const : "APPROVE" as const,
-    riskScore, factors, rules, reviewRequirements: reviews,
+    verdict, riskAssessment, riskScore, factors, rules, reviewRequirements: reviews,
     executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence,
     requiresHumanConsent: true as const, policyVersion: POLICY.version,
     policyHash: hash(POLICY), inputHash: hash(input),

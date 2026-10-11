@@ -1,8 +1,28 @@
 # Gate Gatekeeper connector — deployment checklist
 
+## Decision response binding (MCP 0.4.1)
+
+Use the existing tools; no additional validation tool is required. After preview or
+evidence submission, return the backend `decision.verdict`, `riskScore`, and
+`riskAssessment.summary` to the user. A `riskAssessment.lowRisk:true` result returns
+APPROVE as a policy recommendation, with human consent still required. Never infer
+approval from the numeric score alone or describe rule points as a probability.
+For an existing proposal, call `gate_get_request` with `request_id` and
+`validate_decision:true`; report `validation.status`, `validation.decision.verdict`,
+and its risk explanation. CHANGED means the stored evaluation needs a fresh
+investigation before review. Deploy the backend and refresh connector discovery to
+0.4.1 to make this binding available to hosted DevRev.
+
 Local stateless Streamable HTTP SDK calls use real scoped Gate identities and sandbox outcomes. Actual DevRev connector discovery/calls, installed custom skill, and second-human reuse remain **UNVERIFIED**. Platform menu labels, authentication support and setup routes have not been observed; confirm them with the authorized team administrator before recording exact instructions. Localhost is reachable only by local SDK callers.
 
 ## Team deployment address
+
+The current DevRev team is
+`https://app.devrev.ai/maplestudio-playground-10-193711`, with DevRev organization
+ID `17WZM4zcjj`. Set `DEVREV_MCP_ORG_ID=17WZM4zcjj` on Render. Keep
+`DEVREV_MCP_EMAIL` matched to the connector token owner and retain the existing
+scoped `DEVREV_MCP_CREDENTIAL_ID`. The team URL is for DevRev navigation; the
+connector server URL remains `https://hackmidwest26.onrender.com/mcp`.
 
 The team supplied `https://hackmidwest26.onrender.com` as the intended public
 base URL. The candidate Gate endpoint is `https://hackmidwest26.onrender.com/mcp`.
@@ -75,4 +95,4 @@ Use `httpAuthenticate` plus `enforceHttpCapability` on REST routes. Cookie mutat
 
 Actual public URL and TLS/proxy/Host configuration; secure per-user connection support; verified platform setup labels; supplied team custom skill and version/hash; observed installation/triggers/discovery/calls; second authorized remote user and different source. Do not infer these from local SDK success or connector registration.
 
-For claim/evidence/failure schemas, leases and reevaluation, see ../docs/gatekeeper-investigations.md. Refresh actual connector discovery to 0.4.0; local acceptance is not remote installation proof.
+For claim/evidence/failure schemas, leases and reevaluation, see ../docs/gatekeeper-investigations.md. Refresh actual connector discovery to 0.4.1; local acceptance is not remote installation proof.

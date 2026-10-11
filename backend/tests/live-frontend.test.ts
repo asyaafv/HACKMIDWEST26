@@ -124,6 +124,10 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await page.getByRole('button',{name:/Run local investigation|Recheck demo evidence/}).click();
  await browserExpect(page.getByText('Policy evaluated',{exact:true}).first()).toBeVisible();
  await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Validate decision',exact:true}).click();
+ await browserExpect(page.getByRole('heading',{name:'Saved decision matches current backend checks',exact:true})).toBeVisible();
+ await page.getByText('Backend risk algorithm',{exact:true}).click();
+ await browserExpect(page.getByText('Duplicate business intent: 20 points',{exact:true})).toBeVisible();
  if(process.env.GATE_UI_CAPTURE){await page.locator('.detail-panel').evaluate(node=>{node.scrollTop=0;});await page.locator('.detail-panel').screenshot({path:process.env.GATE_UI_CAPTURE});}
  await page.getByText('Evaluation history (2)',{exact:true}).click();
  await browserExpect(page.getByText('Version 2: REVIEW · 20 risk points',{exact:true})).toBeVisible();
@@ -135,5 +139,24 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  const host=new URL(base).host;
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,projectId:randomUUID()}})).statusCode).toBe(404);
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,amountMinor:'1.5'}})).statusCode).toBe(400);
+ await page.goto(`${frontend}/gatekeepers`);
+ await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
+ await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('742.35');
+ await page.getByLabel('Spend category',{exact:true}).selectOption('incident_response');
+ await page.getByLabel('Business purpose',{exact:true}).fill('Simulated agent purchase from Gatekeepers');
+ await page.getByLabel('Find supporting evidence').fill('GATE-ISSUE-101');
+ await page.getByRole('button',{name:'Search sources'}).click();
+ await page.getByLabel('Supporting source').selectOption('pm:GATE-ISSUE-101');
+ await page.getByRole('button',{name:'Preview policy'}).click();
+ await browserExpect(page.getByText('Review: DUPLICATE BUSINESS INTENT')).toBeVisible();
+ expect((await admin.query("SELECT count(*) FROM requests WHERE origin='SIMULATED_PURCHASE'")).rows[0].count).toBe('1');
+ await page.getByRole('button',{name:'Record simulated request',exact:true}).click();
+ await browserExpect(page.getByRole('dialog',{name:'Simulate purchase',exact:true})).toHaveCount(0);
+ expect((await admin.query("SELECT count(*) FROM requests WHERE origin='SIMULATED_PURCHASE'")).rows[0].count).toBe('2');
+ const validation=(await app.inject({url:`/v1/demo/transactions/${rows[0].id}/validation`,headers:{host}})).json().data;
+ expect(validation.status).toBe('CHANGED');expect(validation.reasons).toContain('POLICY_FINDINGS_CHANGED');
+ expect(validation.decision.factors).toContainEqual({code:'DUPLICATE_INTENT',points:20});
  await page.close();
 });

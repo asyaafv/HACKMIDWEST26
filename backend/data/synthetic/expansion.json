@@ -1,0 +1,16 @@
+{
+  "records": [
+    {"id":"GATE-ISSUE-606","kind":"issue","title":"Pinecrest API timeout spike","status":"open","observedAt":"2026-10-09T18:00:00Z","ticketId":"GATE-TICKET-606","component":"public-api"},
+    {"id":"GATE-TICKET-606","kind":"ticket","title":"Intermittent API timeouts","accountId":"GATE-ACCOUNT-606","openedAt":"2026-10-09T18:20:00Z","impact":"Some API calls require retries"},
+    {"id":"GATE-ACCOUNT-606","kind":"account","title":"Pinecrest Software","name":"Pinecrest Software","tier":"enterprise"},
+    {"id":"GATE-DOC-606","kind":"document","title":"Pinecrest triage note","ticketId":"GATE-TICKET-606","recordedAt":"2026-10-09T19:00:00Z","text":"Engineering is investigating API timeouts. No purchase has been approved."},
+    {"id":"GATE-ISSUE-707","kind":"issue","title":"Juniper search indexing lag","status":"open","observedAt":"2026-10-10T08:00:00Z","ticketId":"GATE-TICKET-707","component":"search-indexer"},
+    {"id":"GATE-TICKET-707","kind":"ticket","title":"Search results are delayed","accountId":"GATE-ACCOUNT-707","openedAt":"2026-10-10T08:30:00Z","impact":"New items appear in search later than expected"},
+    {"id":"GATE-ACCOUNT-707","kind":"account","title":"Juniper Retail","name":"Juniper Retail","tier":"growth"},
+    {"id":"GATE-DOC-707","kind":"document","title":"Juniper support summary","ticketId":"GATE-TICKET-707","recordedAt":"2026-10-10T09:00:00Z","text":"Support confirmed indexing lag and requested diagnostics. No spending decision is recorded."},
+    {"id":"GATE-ISSUE-808","kind":"issue","title":"Cedar backup verification alert","status":"open","observedAt":"2026-10-10T09:15:00Z","ticketId":"GATE-TICKET-808","component":"backup-verifier"},
+    {"id":"GATE-TICKET-808","kind":"ticket","title":"Backup verification needs review","accountId":"GATE-ACCOUNT-808","openedAt":"2026-10-10T09:30:00Z","impact":"Latest backup has not completed verification"},
+    {"id":"GATE-ACCOUNT-808","kind":"account","title":"Cedar Health","name":"Cedar Health","tier":"enterprise"},
+    {"id":"GATE-DOC-808","kind":"document","title":"Cedar response note","ticketId":"GATE-TICKET-808","recordedAt":"2026-10-10T10:00:00Z","text":"The team is checking backup integrity. This note is context only and does not authorize a purchase."}
+  ]
+}

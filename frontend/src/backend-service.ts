@@ -1,7 +1,7 @@
 /** Maps stored transactions and their independent Gate reviews into the main dashboard. */
 import { LiveApi, type Proposal } from './live-api';
 import { merchants as artwork } from './data';
-import type { AuditEvent, DemoDataService, DemoState, GatekeeperInput, PolicyKind, RequestInput, Settings, Transaction, Merchant, Evidence, Investigation } from './types';
+import type { AuditEvent, DemoDataService, DemoState, GatekeeperInput, PolicyKind, RequestInput, Settings, Transaction, Merchant, Evidence, Investigation, RiskAssessment } from './types';
 export const api = new LiveApi();
 interface Catalog {
  agents: { id: string; name: string; active: boolean; project_id: string; owner_id: string; cap_minor: string; can_purchase?:boolean; created_at?: string }[];
@@ -11,7 +11,7 @@ interface Catalog {
 }
 interface RecordRow {
  id: string; version: number; origin?: string; createdAt: string; proposal: Proposal; workflowStatus: string; consentStatus: string; authorizationStatus: string;
- decision: { verdict: string; riskScore: number; policyVersion: string; rules: { code: string; result: string; actual?: string; threshold?: string }[]; factors: { code: string; points: number }[]; reviewRequirements: { code: string; resolution: string }[] };
+ decision: { verdict: string; riskScore: number; riskAssessment?:RiskAssessment;policyVersion: string; rules: { code: string; result: string; actual?: string; threshold?: string }[]; factors: { code: string; points: number }[]; reviewRequirements: { code: string; resolution: string }[] };
  evidence: { items: { id: string; domain: string; sourceId: string; content: Record<string, unknown>; sourceHash: string }[]; missing: string[]; links: unknown[]; bundleHash: string; complete?:boolean; investigation?:{report:{unresolvedQuestions:string[]}} };
  payment: unknown; snapshotHash: string; transactionReview: null | { choice: string; reason: string; request_version?:number }; investigation?:Investigation|null;
 }
@@ -32,7 +32,7 @@ export class BackendService implements DemoDataService {
       simulated: r.origin === 'SIMULATED_PURCHASE', id: r.id, agentId: r.proposal.agentId, merchantId: r.proposal.merchantId, amount: Number(r.proposal.amountMinor), priority: 'P2',
       decision: review?.choice === 'approve' ? 'Approved' : review?.choice === 'reject' ? 'Blocked' : 'Pending',
       reason: review?.reason, investigation:r.payment?null:r.investigation,canApprove:!r.investigation||!!r.payment||(r.evidence.complete!==false&&r.decision.verdict!=='REJECT'),unresolvedQuestions:r.evidence.investigation?.report.unresolvedQuestions,previousReview:!review&&r.transactionReview?r.transactionReview:undefined, reviewBinding: {version:r.version,snapshotHash:r.snapshotHash},
-      risk: r.decision.riskScore, createdAt: r.createdAt, purpose: r.proposal.purpose, project: c.projects.find(p => p.id === r.proposal.projectId)?.name ?? r.proposal.projectId,
+      risk: r.decision.riskScore, riskAssessment:r.decision.riskAssessment,createdAt: r.createdAt, purpose: r.proposal.purpose, project: c.projects.find(p => p.id === r.proposal.projectId)?.name ?? r.proposal.projectId,
       category: r.proposal.category, source: r.proposal.source, reviewRequirements: r.decision.reviewRequirements,
       paymentMethod: r.payment ? 'Existing PostgreSQL payment' : 'Stored transaction request', workflowStatus: r.workflowStatus, policyVerdict: r.decision.verdict, authorizationStatus: review ? 'REVIEWED' : 'AWAITING_REVIEW',
       backend: r, historicalPayment:r.payment, analysis: {factors:r.decision.factors,missing:r.evidence.missing,policyVersion:r.decision.policyVersion,links:r.evidence.links}, evidence: r.evidence.items.map((e): Evidence => ({ id: e.id, title: String(e.content.title ?? e.sourceId), subtitle: `${e.domain} · ${e.sourceId}`, kind: 'request', text: JSON.stringify(e.content, null, 2), sourceId: e.sourceId, domain: e.domain, sourceHash: e.sourceHash })),

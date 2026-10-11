@@ -68,6 +68,10 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       reply.code(201);return {data:result,meta:{traceId:req.id}};
     });
     demo.get('/transactions/:id/history', async req => ({data:await service.evaluationHistory(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}}));
+    demo.get('/transactions/:id/validation', async (req,reply) => {
+      reply.header('Cache-Control','no-store');
+      return {data:await service.validateDecision(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}};
+    });
     demo.post('/transactions/:id/investigation', async req => ({data:await investigations.localRun(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
     demo.post('/transactions/:id/review', async req => ({data:await reviewTransaction(db,
       await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
@@ -115,6 +119,10 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
     api.post("/policy/preview", async req => wrap(await service.previewProposal(await principal(req), req.body), req.id));
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
+    api.get("/requests/:id/validation", async (req,reply) => {
+      reply.header('Cache-Control','no-store');
+      return wrap(await service.validateDecision(await principal(req), id(req)), req.id);
+    });
 
     api.get('/requests/:id/history', async req => wrap(await service.evaluationHistory(await principal(req),id(req)),req.id));
     api.post('/requests/:id/investigation/start', async req => wrap(await investigations.start(await principal(req),id(req),req.body,key(req)),req.id));

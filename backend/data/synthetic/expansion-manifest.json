@@ -1,0 +1,184 @@
+{
+  "datasetLabel": "SYNTHETIC_DEMO_EXPANSION",
+  "datasetVersion": "1.0.0",
+  "referenceTime": "2026-10-10T12:00:00Z",
+  "files": [
+    {
+      "path": "expansion.json",
+      "sha256": "69df5edd73becc5f3d2b079ff84097bb323d144243c0c3130d803c3bb1216d4b"
+    }
+  ],
+  "records": [
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-606",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/0",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-606",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-606",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/1",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-606",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-606",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/2",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "document",
+      "sourceId": "GATE-DOC-606",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/3",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-606",
+          "pointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-707",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/4",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-707",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-707",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/5",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-707",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-707",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/6",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "document",
+      "sourceId": "GATE-DOC-707",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/7",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-707",
+          "pointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "pm",
+      "sourceId": "GATE-ISSUE-808",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/8",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-808",
+          "pointer": "/ticketId",
+          "relationship": "ISSUE_TICKET"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-TICKET-808",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/9",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-ACCOUNT-808",
+          "pointer": "/accountId",
+          "relationship": "TICKET_ACCOUNT"
+        }
+      ]
+    },
+    {
+      "domain": "crm",
+      "sourceId": "GATE-ACCOUNT-808",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/10",
+      "idPointer": "/id",
+      "links": []
+    },
+    {
+      "domain": "document",
+      "sourceId": "GATE-DOC-808",
+      "project": "main",
+      "path": "expansion.json",
+      "pointer": "/records/11",
+      "idPointer": "/id",
+      "links": [
+        {
+          "domain": "crm",
+          "sourceId": "GATE-TICKET-808",
+          "pointer": "/ticketId",
+          "relationship": "DOCUMENT_TICKET"
+        }
+      ]
+    }
+  ]
+}
