@@ -70,14 +70,15 @@ export function Decisions() {
 }
 
 export function Gatekeepers() {
-  const { state, busy } = useDemo(); const [params] = useSearchParams();
+  const { state, busy } = useDemo(); const navigate = useNavigate(); const [simulate,setSimulate] = useState(false); const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get('search') ?? ''), [status, setStatus] = useState('All'), [viewingId, setViewingId] = useState<string | null>(null);
   useEffect(() => { setQuery(params.get('search') ?? ''); }, [params]);
   const agents = state!.agents.filter(a => `${a.name} ${a.description} ${a.department}`.toLowerCase().includes(query.toLowerCase()) && (status === 'All' || (status === 'Active' ? a.active : !a.active)));
   const viewing = state!.agents.find(a => a.id === viewingId);
-  return <main className="page-main"><PageTitle title="Gatekeepers" description="The agents behind every request." action={<button type="button" className="button primary" disabled title="Use backend identity provisioning"><Plus size={18} />Create Gatekeeper</button>} />
+  return <main className="page-main"><PageTitle title="Gatekeepers" description="The agents behind every request." action={<button type="button" className="button primary" disabled={busy} onClick={()=>setSimulate(true)}><Plus size={18} />Simulate purchase</button>} />
     <p className="animation-preview-link"><Link className="text-link" to="/animation-preview">Try the animated character<ArrowRight size={17} /></Link></p><div className="page-toolbar"><label className="local-search"><MagnifyingGlass size={19} /><input aria-label="Search Gatekeepers" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search Gatekeepers…" /></label><div className="segmented">{['All', 'Active', 'Paused'].map(s => <button key={s} type="button" className={status === s ? 'active' : ''} aria-pressed={status === s} onClick={() => setStatus(s)}>{s}<span className="count">{state!.agents.filter(a => s === 'All' || (s === 'Active' ? a.active : !a.active)).length}</span></button>)}</div></div>
     {agents.length ? <div className="gatekeeper-grid">{agents.map(a => <article className="gatekeeper-card" key={a.id}><button type="button" className="gatekeeper-open" aria-label={`Open ${a.name}`} title={`Open ${a.name}`} disabled={busy} onClick={() => setViewingId(a.id)}><span className="sr-only">Open {a.name}</span></button><div className="gatekeeper-portrait"><Avatar agent={a} size={160} /><span className={`agent-state ${a.active ? 'active' : 'paused'}`}>{a.active ? 'Active' : 'Paused'}</span></div><h2>{a.name}</h2><p className="department">{a.department}</p><p className="agent-description">{a.description}</p><div className="gatekeeper-bottom"><span>{state!.transactions.filter(t => t.agentId === a.id).length} requests</span><div><IconButton icon={PencilSimple} label={`Edit ${a.name}`} disabled /><IconButton icon={a.active ? Pause : Play} label={`${a.active ? 'Pause' : 'Resume'} ${a.name}`} disabled /></div></div></article>)}</div> : <Empty title="No matching Gatekeepers">Try another search or check the backend agent provisioning.</Empty>}
+    {simulate && <RequestForm simulation onClose={()=>setSimulate(false)} onCreated={id=>navigate(`/transactions?request=${id}`)} />}
     {viewing && <Dialog title={viewing.name} description={viewing.department} onClose={() => setViewingId(null)}>
       <Avatar agent={viewing} size={112} />
       <p className="section-intro">{viewing.description}</p>

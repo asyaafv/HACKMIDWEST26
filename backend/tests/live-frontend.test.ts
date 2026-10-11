@@ -89,3 +89,33 @@ it('reviews existing payments without financial mutations and rejects stale, rac
  expect((await app.inject({url:'/dev-console',headers:{host}})).statusCode).toBe(404);
  const disabled=createApp(runtime);try{expect((await disabled.inject({url:'/v1/demo/dashboard'})).statusCode).toBe(404);}finally{await disabled.close();}
 });
+it('Gatekeepers simulation button saves one evaluated proposal after a lost response and creates no payment',async()=>{
+ const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(`${frontend}/gatekeepers`);
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
+ await browserExpect(page.getByRole('heading',{name:'Gatekeepers',exact:true})).toBeVisible();
+ await browserExpect(page.getByRole('button',{name:'Create Gatekeeper',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
+ await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('742.35');
+ await page.getByLabel('Business purpose',{exact:true}).fill('Simulated agent purchase from Gatekeepers');
+ await page.getByLabel('Find supporting evidence').fill('GATE-ISSUE-101');await page.getByRole('button',{name:'Search sources'}).click();
+ await browserExpect(page.getByLabel('Supporting source').locator('option')).toHaveCount(2);
+ await page.getByLabel('Supporting source').selectOption('pm:GATE-ISSUE-101');
+ const before=(await admin.query('SELECT (SELECT count(*) FROM payments) AS payments,(SELECT count(*) FROM jobs) AS jobs,(SELECT count(*) FROM budget_entries) AS entries')).rows[0];
+ await page.route('**/v1/demo/purchases',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/purchases');});
+ await page.getByRole('dialog',{name:'Simulate purchase',exact:true}).getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
+ await page.getByRole('dialog',{name:'Simulate purchase',exact:true}).getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await browserExpect(page.getByRole('dialog',{name:'Simulate purchase',exact:true})).toHaveCount(0);
+ await browserExpect(page.getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
+ await browserExpect(page.getByText('Simulated purchase · imported demo evidence evaluated by Gate. Live DevRev investigation pending.',{exact:true})).toBeVisible();
+ const rows=(await admin.query("SELECT * FROM requests WHERE proposal->>'purpose'='Simulated agent purchase from Gatekeepers'")).rows;
+ expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({origin:'SIMULATED_PURCHASE',amount_minor:'74235'});
+ expect(rows[0].evidence.items.length).toBeGreaterThan(0);expect(rows[0].decision.rules.length).toBeGreaterThan(0);
+ expect((await admin.query('SELECT (SELECT count(*) FROM payments) AS payments,(SELECT count(*) FROM jobs) AS jobs,(SELECT count(*) FROM budget_entries) AS entries')).rows[0]).toEqual(before);
+ const host=new URL(base).host;
+ expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,projectId:randomUUID()}})).statusCode).toBe(404);
+ expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,amountMinor:'1.5'}})).statusCode).toBe(400);
+ await page.close();
+});

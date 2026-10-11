@@ -12,7 +12,8 @@ The current schema stores transactions as `requests` plus optional linked
 request remains visible whether pending, rejected, completed or historically paid.
 The response contains the latest 50 granted-project records and 100 related audit
 entries. This is a bounded window, not a complete ledger. All loaded dates are shown
-by default. New records arrive through database ingestion or authenticated MCP/API;
+by default. New records arrive through database ingestion, authenticated MCP/API, or an explicit
+Simulate purchase action;
 the dashboard does not fabricate them or run a payment worker.
 
 ## Reviews
@@ -60,3 +61,20 @@ request/payment schema; it is not assumed implemented by the dashboard connectio
 
 Run ./run-gate.sh. Restart a previously running launcher in its owning terminal.
 Preparation preserves financial history. No local tokens need copying or entering.
+
+## Simulate purchase from Gatekeepers
+
+The Gatekeepers page replaces its unsupported Create Gatekeeper button with
+Simulate purchase. The form chooses an active purchasing agent, merchant, exact
+USD amount, purpose and authorized supporting source. Demo source search and
+POST /v1/demo/purchases require the configured workspace/Host/Origin. The backend
+resolves the selected agent's owner from PostgreSQL; the browser cannot supply
+an actor, organization or credential. Existing credential IDs satisfy provenance
+foreign keys but no bearer token is passed or authenticated for this simulation.
+
+The real GateService creates evidence, policy findings, an immutable initial
+revision and an audit entry. The permanently stored SIMULATED_PURCHASE origin is
+shown in transaction details, including the fact that DevRev investigation is
+pending. The form opens the saved transaction after submission. Retained keys
+make lost-response retries create one proposal. No payment/job/budget reservation
+is created, and the simulation does not claim a live AI investigation.

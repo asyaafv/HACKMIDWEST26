@@ -54,7 +54,7 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
 }
 
 function projection(row: any, payment?: any, approval?: any) {
-  return { id: row.id, version: row.version, proposal: row.proposal, workflowStatus: row.status,
+  return { id: row.id, version: row.version, origin: row.origin ?? "REQUEST", proposal: row.proposal, workflowStatus: row.status,
     policyVerdict: row.decision?.verdict ?? null, consentStatus: approval ? approval.choice === "approve" ? "GRANTED" : "DECLINED" : "NONE",
     authorizationStatus: !payment && approval?.choice === "approve" ? "REVIEWED" : payment ? payment.hold_state === "CAPTURED" ? "CONSUMED" : payment.hold_state === "RELEASED" ? "REVOKED" : payment.dispatched_at ? "DISPATCHED" : "READY" : "NONE",
     decision: row.decision, evidence: row.evidence, createdAt: row.created_at,
@@ -96,23 +96,23 @@ export class GateService {
     });
   }
 
-  async create(principal: Principal, input: unknown, key: string) {
+  async create(principal: Principal, input: unknown, key: string, origin: "REQUEST" | "SIMULATED_PURCHASE" = "REQUEST") {
     roleAccess(principal, ["OPERATOR", "AGENT"]);
     const proposal = proposalSchema.parse(input);
     keySchema.parse(key);
-    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, proposal, async () => {
+    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, origin === "REQUEST" ? proposal : {proposal,origin}, async () => {
       const ctx = await context(tx, principal, proposal);
       requireThat(ctx.agent.owner_id === principal.id, "FORBIDDEN", "You may submit only for your assigned agent.", 403);
       const evidence = await collectEvidence(tx, principal, proposal);
       const decision = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
       const status = decision.verdict === "REJECT" ? "REJECTED" : evidence.complete ? "AWAITING_CONSENT" : "AWAITING_EVIDENCE";
       const id = randomUUID();
-      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, status])).rows[0];
+      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status,origin)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, status, origin])).rows[0];
       await tx.query(`INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash)
         VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9)`, [randomUUID(), principal.orgId, id, proposal, hash(proposal), evidence, hash(evidence), decision, hash(decision)]);
-      await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, evidenceHash: evidence.bundleHash, decision });
+      await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, origin, evidenceHash: evidence.bundleHash, decision });
       return projection(row);
     }));
   }
