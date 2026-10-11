@@ -1,10 +1,18 @@
-/** Pure eligibility rules: hard denials win; summed risk points are not probabilities. */
+/** Gate Contextual Spend Risk (GCSR): deterministic review points, never a fraud probability. */
 import type { Proposal } from "./contracts.js";
 import { hash } from "./hash.js";
 
+export const RISK_ALGORITHM = Object.freeze({
+  name: "Gate Contextual Spend Risk", code: "GCSR", version: 1,
+  amountHighMinor: "200000", budgetPressurePercent: 80, dailyPressurePercent: 80,
+  points: Object.freeze({ amountModerate: 20, amountHigh: 35, merchantReview: 25,
+    missingEvidence: 30, duplicateIntent: 20, contradictoryEvidence: 35,
+    budgetPressure: 20, dailyPressure: 25 }),
+});
 export const POLICY = Object.freeze({
-  version: "gate-policy-v1", automaticMaxMinor: "50000", dailyMaxMinor: "1000000",
+  version: "gate-policy-v2", automaticMaxMinor: "50000", dailyMaxMinor: "1000000",
   dailyMaxRequests: 10, reviewScoreThreshold: 40, ttlSeconds: 300,
+  riskAlgorithm: RISK_ALGORITHM,
 });
 export interface PolicyInput {
   proposal: Proposal;
@@ -33,23 +41,30 @@ export function evaluate(input: PolicyInput) {
   hard("DAILY_COUNT_CAP", input.dailyCount < POLICY.dailyMaxRequests);
   if (amount > BigInt(POLICY.automaticMaxMinor)) {
     reviews.push({ code: "AMOUNT_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "AMOUNT", points: amount > 200000n ? 35 : 20 });
+    factors.push({ code: "AMOUNT", points: amount > BigInt(RISK_ALGORITHM.amountHighMinor) ? RISK_ALGORITHM.points.amountHigh : RISK_ALGORITHM.points.amountModerate });
   }
   if (input.merchantStatus === "REVIEW") {
     reviews.push({ code: "MERCHANT_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "MERCHANT", points: 25 });
+    factors.push({ code: "MERCHANT", points: RISK_ALGORITHM.points.merchantReview });
   }
   if (!input.evidenceComplete) {
     reviews.push({ code: "REQUIRED_EVIDENCE_MISSING", resolution: "NEW_EVIDENCE" });
-    factors.push({ code: "EVIDENCE", points: 30 });
+    factors.push({ code: "EVIDENCE", points: RISK_ALGORITHM.points.missingEvidence });
   }
   if (input.duplicateIntent) {
     reviews.push({ code: "DUPLICATE_BUSINESS_INTENT", resolution: "HUMAN_JUDGMENT" });
-    factors.push({ code: "DUPLICATE_INTENT", points: 20 });
+    factors.push({ code: "DUPLICATE_INTENT", points: RISK_ALGORITHM.points.duplicateIntent });
   }
   if (input.contradictoryEvidence) {
     reviews.push({ code: "CONTRADICTORY_REQUIRED_EVIDENCE", resolution: "NEW_EVIDENCE" });
-    factors.push({ code: "CONTRADICTION", points: 35 });
+    factors.push({ code: "CONTRADICTION", points: RISK_ALGORITHM.points.contradictoryEvidence });
+  }
+  const available = BigInt(input.budgetAvailableMinor);
+  if (available > 0n && amount * 100n >= available * BigInt(RISK_ALGORITHM.budgetPressurePercent)) {
+    factors.push({ code: "BUDGET_PRESSURE", points: RISK_ALGORITHM.points.budgetPressure });
+  }
+  if ((BigInt(input.dailyUsedMinor) + amount) * 100n >= BigInt(POLICY.dailyMaxMinor) * BigInt(RISK_ALGORITHM.dailyPressurePercent)) {
+    factors.push({ code: "DAILY_PRESSURE", points: RISK_ALGORITHM.points.dailyPressure });
   }
   const riskScore = Math.min(100, factors.reduce((sum, factor) => sum + factor.points, 0));
   if (riskScore >= POLICY.reviewScoreThreshold && !reviews.some(r => r.resolution === "NEW_EVIDENCE")) {
@@ -58,7 +73,7 @@ export function evaluate(input: PolicyInput) {
   const denied = rules.some(r => r.result === "FAIL");
   return {
     verdict: denied ? "REJECT" as const : reviews.length ? "REVIEW" as const : "APPROVE" as const,
-    riskScore, factors, rules, reviewRequirements: reviews,
+    riskScore, riskAlgorithm: RISK_ALGORITHM.name, factors, rules, reviewRequirements: reviews,
     executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence,
     requiresHumanConsent: true as const, policyVersion: POLICY.version,
     policyHash: hash(POLICY), inputHash: hash(input),
