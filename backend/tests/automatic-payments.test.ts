@@ -61,6 +61,24 @@ it('dashboard approval authorizes an expensive purchase and replays without anot
   expect(await service.get(p,row.id)).toMatchObject({workflowStatus:'COMPLETED',payment:{status:'SUCCEEDED'}});
  } finally {await app.close();}
 });
+it('finance can deny evidence-pending purchases with a bound snapshot and safe replay',async()=>{
+ const request=await service.create(p,{...proposal,amountMinor:'100001',source:{domain:'pm',sourceId:'MISSING-REQUIRED-SOURCE'}},randomUUID());
+ expect(request.workflowStatus).toBe('AWAITING_EVIDENCE');
+ const finance=(await admin.query("SELECT * FROM principals WHERE org_id=$1 AND role='FINANCE'",[p.orgId])).rows[0];
+ const app=createApp(runtime,{paymentExecution:true,demoWorkspace:{orgId:p.orgId,principalId:finance.id},origins:['http://localhost:5173'],browserHosts:['localhost:8000']});
+ try {
+  const row=(await app.inject({url:'/v1/demo/dashboard',headers:{host:'localhost:8000'}})).json().data.requests.find((r:any)=>r.id===request.id);
+  const payments=(await admin.query('SELECT count(*) FROM payments')).rows[0].count;
+  const submit=(body:any,key:string)=>app.inject({method:'POST',url:`/v1/demo/transactions/${row.id}/review`,headers:{host:'localhost:8000',origin:'http://localhost:5173','idempotency-key':key},payload:body});
+  const body={choice:'reject',reason:'Required evidence cannot be verified',expectedVersion:row.version,snapshotHash:row.snapshotHash};
+  expect((await submit({...body,expectedVersion:row.version+1},randomUUID())).statusCode).toBe(409);
+  expect((await submit({...body,choice:'approve'},randomUUID())).statusCode).toBe(409);
+  const key=randomUUID(),first=await submit(body,key);expect(first.statusCode).toBe(200);
+  expect((await submit(body,key)).json().data).toEqual(first.json().data);
+  expect(await service.get(p,row.id)).toMatchObject({workflowStatus:'REJECTED',payment:null,transactionReview:{choice:'reject',reason:body.reason}});
+  expect((await admin.query('SELECT count(*) FROM payments')).rows[0].count).toBe(payments);
+ } finally {await app.close();}
+});
 it('revoked evidence cancels automatic authority before dispatch and releases its hold',async()=>{
  const request=await service.create(p,{...proposal,amountMinor:'20002'},randomUUID());
  expect(request.workflowStatus).toBe('AUTHORIZED');

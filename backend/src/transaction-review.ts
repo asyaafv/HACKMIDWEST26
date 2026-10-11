@@ -11,7 +11,7 @@ import { idempotent } from './idempotency.js';
 import { appendAudit } from './audit.js';
 
 export interface DemoWorkspace { orgId: string; principalId: string }
-const reviewSchema = z.object({ choice: z.enum(['approve','reject']), reason: z.string().trim().min(1).max(1000),
+export const reviewSchema = z.object({ choice: z.enum(['approve','reject']), reason: z.string().trim().min(1).max(1000),
   expectedVersion: z.number().int().positive(), snapshotHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 
 /** Only financial/evaluation fields enter the SHA-256 binding; timestamps are not canonicalized as Dates. */
