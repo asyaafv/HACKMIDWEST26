@@ -27,6 +27,16 @@ single testing environment does not establish that the deployed service is down.
 Gate currently provides bearer-authenticated MCP; confirm the team's DevRev
 connection supports this before choosing authentication fields.
 
+The observed DevRev Computer custom MCP connection verifies its secret as a
+DevRev personal access token before saving it. For this connector only, Gate can
+validate that token against DevRev's `dev-users.self` endpoint and map exactly
+one configured DevRev email/org to one existing, expiring Gate AGENT credential.
+Enable with all three Render variables: `DEVREV_MCP_EMAIL`,
+`DEVREV_MCP_ORG_ID` (the DevRev `devo/` segment), and
+`DEVREV_MCP_CREDENTIAL_ID`. This does not change REST authentication. Omit all
+three to disable the bridge. The linked Gate credential still controls project
+scope, capabilities, and expiry. DevRev resync is needed after configuration.
+
 The browser dashboard is a separate frontend deployment. DevRev uses the
 authenticated `/mcp` endpoint directly.
 

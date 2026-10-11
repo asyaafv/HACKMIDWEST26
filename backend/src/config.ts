@@ -10,5 +10,9 @@ export function configuration(env: NodeJS.ProcessEnv = process.env) {
     APP_MODE: z.literal("sandbox").default("sandbox"),
     ALLOWED_ORIGINS: z.string().default("http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000"),
     MCP_ALLOWED_HOSTS: z.string().default("localhost:8000,127.0.0.1:8000"),
-  }).refine(v => Boolean(v.DEMO_WORKSPACE_ORG_ID) === Boolean(v.DEMO_WORKSPACE_PRINCIPAL_ID), "Configure both demo workspace IDs.").parse(env);
+    DEVREV_MCP_EMAIL: z.string().email().optional(),
+    DEVREV_MCP_ORG_ID: z.string().optional(),
+    DEVREV_MCP_CREDENTIAL_ID: z.string().uuid().optional(),
+  }).refine(v => Boolean(v.DEMO_WORKSPACE_ORG_ID) === Boolean(v.DEMO_WORKSPACE_PRINCIPAL_ID), "Configure both demo workspace IDs.")
+    .refine(v => [v.DEVREV_MCP_EMAIL,v.DEVREV_MCP_ORG_ID,v.DEVREV_MCP_CREDENTIAL_ID].filter(Boolean).length === 0 || [v.DEVREV_MCP_EMAIL,v.DEVREV_MCP_ORG_ID,v.DEVREV_MCP_CREDENTIAL_ID].every(Boolean), "Configure all DevRev MCP identity fields.").parse(env);
 }
