@@ -18,7 +18,7 @@ export async function requestRow(tx: Tx, principal: Principal, id: string, lock 
   const row = (await tx.query(`SELECT * FROM requests WHERE org_id=$1 AND id=$2 ${lock ? "FOR UPDATE" : ""}`, [principal.orgId, id])).rows[0];
   requireThat(row, "NOT_FOUND", "Request not found.", 404);
   await projectAccess(tx, principal, row.project_id);
-  if (principal.role === "AGENT") {
+  if (principal.role === "AGENT" && !principal.capabilities?.includes("investigation:write")) {
     const agent = (await tx.query("SELECT owner_id FROM agents WHERE org_id=$1 AND id=$2", [principal.orgId, row.agent_id])).rows[0];
     requireThat(agent.owner_id === principal.id, "NOT_FOUND", "Request not found.", 404);
   }
@@ -36,7 +36,7 @@ async function context(tx: Tx, principal: Principal, proposal: Proposal, lock = 
   return { agent, merchant, budget };
 }
 
-async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx: Awaited<ReturnType<typeof context>>, complete: boolean, contradictoryEvidence = false) {
+async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx: Awaited<ReturnType<typeof context>>, complete: boolean, contradictoryEvidence = false, excludeRequestId?:string) {
   const velocity = (await tx.query(`SELECT COALESCE(sum(p.amount_minor),0)::text AS used,count(*)::integer AS count FROM payments p
     JOIN requests r ON r.org_id=p.org_id AND r.id=p.request_id
     WHERE p.org_id=$1 AND r.agent_id=$2 AND p.created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
@@ -46,7 +46,7 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
     WHERE r.org_id=$1 AND r.agent_id=$2 AND r.merchant_id=$3 AND r.amount_minor=$4
       AND r.proposal->'source'=$5::jsonb AND r.id<>COALESCE($6::uuid,'00000000-0000-0000-0000-000000000000'::uuid)
       AND r.created_at>=now()-interval '10 minutes' AND (p.status IN ('QUEUED','PROCESSING','UNKNOWN','SUCCEEDED') OR (r.status='AUTHORIZED' AND EXISTS (SELECT 1 FROM approvals a WHERE a.org_id=r.org_id AND a.request_id=r.id AND a.choice='approve'))) LIMIT 1`,
-    [principal.orgId, proposal.agentId, proposal.merchantId, proposal.amountMinor, proposal.source, null])).rows.length > 0;
+    [principal.orgId, proposal.agentId, proposal.merchantId, proposal.amountMinor, proposal.source, excludeRequestId??null])).rows.length > 0;
   return evaluate({ duplicateIntent: duplicate, contradictoryEvidence, proposal, agentActive: ctx.agent.active, agentCapMinor: ctx.agent.cap_minor,
     merchantStatus: ctx.merchant.status,
     budgetAvailableMinor: (BigInt(ctx.budget.limit_minor) - BigInt(ctx.budget.spent_minor) - BigInt(ctx.budget.reserved_minor)).toString(),
@@ -54,7 +54,7 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
 }
 
 function projection(row: any, payment?: any, approval?: any) {
-  return { id: row.id, version: row.version, proposal: row.proposal, workflowStatus: row.status,
+  return { id: row.id, version: row.version, origin: row.origin ?? "REQUEST", proposal: row.proposal, workflowStatus: row.status,
     policyVerdict: row.decision?.verdict ?? null, consentStatus: approval ? approval.choice === "approve" ? "GRANTED" : "DECLINED" : "NONE",
     authorizationStatus: !payment && approval?.choice === "approve" ? "REVIEWED" : payment ? payment.hold_state === "CAPTURED" ? "CONSUMED" : payment.hold_state === "RELEASED" ? "REVOKED" : payment.dispatched_at ? "DISPATCHED" : "READY" : "NONE",
     decision: row.decision, evidence: row.evidence, createdAt: row.created_at,
@@ -81,11 +81,29 @@ export class GateService {
           ["AWAITING_EVIDENCE","AWAITING_CONSENT","AUTHORIZED"].includes(row.status) && !payment?.dispatched_at ? ["CANCEL"] : []),
         ...(["FINANCE","ADMIN"].includes(principal.role) && can("finance:reconcile") && payment?.dispatched_at && payment.hold_state === "HELD" ? ["RECONCILE"] : []),
       ];
-      const transactionReview = (await tx.query('SELECT * FROM transaction_reviews WHERE org_id=$1 AND request_id=$2',[principal.orgId,id])).rows[0] ?? null;
-      return { ...projection(row, payment, approval), transactionReview, permittedActions };
+      const transactionReview = (await tx.query('SELECT * FROM transaction_reviews WHERE org_id=$1 AND request_id=$2 ORDER BY request_version DESC LIMIT 1',[principal.orgId,id])).rows[0] ?? null;
+      const investigation=(await tx.query('SELECT * FROM investigations WHERE org_id=$1 AND request_id=$2',[principal.orgId,id])).rows[0] ?? null;
+      return { ...projection(row, payment, approval), transactionReview, investigation, permittedActions };
     });
   }
 
+  /** Reevaluation is advisory: it cannot reserve budget or create a payment. */
+  async evaluateInvestigation(tx:Tx,principal:Principal,row:any,evidence:any) {
+    const ctx=await context(tx,principal,row.proposal);
+    return decisionFor(tx,principal,row.proposal,ctx,evidence.complete,Boolean(evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+  }
+  async evaluationHistory(principal:Principal,id:string) {
+    return transaction(this.db,principal.orgId,async tx=>{
+      await requestRow(tx,principal,id);
+      const rows=(await tx.query('SELECT revision,decision,evidence,created_at FROM request_revisions WHERE org_id=$1 AND request_id=$2 ORDER BY revision DESC LIMIT 10',[principal.orgId,id])).rows;
+      const reviews=(await tx.query('SELECT request_version,choice,reason,created_at FROM transaction_reviews WHERE org_id=$1 AND request_id=$2 ORDER BY request_version DESC LIMIT 10',[principal.orgId,id])).rows;
+      return {items:rows.map(r=>({version:r.revision,createdAt:r.created_at,verdict:r.decision.verdict,riskScore:r.decision.riskScore,
+        evidenceHash:r.evidence.bundleHash,mode:r.evidence.investigation?.mode??'INITIAL_CHECK',
+        unresolvedQuestions:r.evidence.investigation?.report?.unresolvedQuestions??[],
+        citations:r.evidence.items.map((item:any)=>({sourceId:item.sourceId,sourceHash:item.sourceHash,contentHash:item.contentHash})),
+        review:reviews.find(review=>review.request_version===r.revision)??null})),limit:10,exhaustive:false};
+    });
+  }
   async previewProposal(principal: Principal, input: unknown) {
     const proposal = proposalSchema.parse(input);
     return transaction(this.db, principal.orgId, async tx => {
@@ -96,23 +114,24 @@ export class GateService {
     });
   }
 
-  async create(principal: Principal, input: unknown, key: string) {
+  async create(principal: Principal, input: unknown, key: string, origin: "REQUEST" | "SIMULATED_PURCHASE" = "REQUEST") {
     roleAccess(principal, ["OPERATOR", "AGENT"]);
     const proposal = proposalSchema.parse(input);
     keySchema.parse(key);
-    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, proposal, async () => {
+    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, origin === "REQUEST" ? proposal : {proposal,origin}, async () => {
       const ctx = await context(tx, principal, proposal);
       requireThat(ctx.agent.owner_id === principal.id, "FORBIDDEN", "You may submit only for your assigned agent.", 403);
       const evidence = await collectEvidence(tx, principal, proposal);
       const decision = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
       const status = decision.verdict === "REJECT" ? "REJECTED" : evidence.complete ? "AWAITING_CONSENT" : "AWAITING_EVIDENCE";
       const id = randomUUID();
-      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, status])).rows[0];
+      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status,origin)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, status, origin])).rows[0];
       await tx.query(`INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash)
         VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9)`, [randomUUID(), principal.orgId, id, proposal, hash(proposal), evidence, hash(evidence), decision, hash(decision)]);
-      await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, evidenceHash: evidence.bundleHash, decision });
+      await tx.query("INSERT INTO investigations(org_id,request_id,status) VALUES($1,$2,'WAITING')",[principal.orgId,id]);
+      await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, origin, evidenceHash: evidence.bundleHash, decision });
       return projection(row);
     }));
   }
@@ -285,16 +304,17 @@ export class GateService {
   async dashboard(principal: Principal) {
     const catalog = await this.catalog(principal);
     return transaction(this.db, principal.orgId, async tx => {
-      const rows = (await tx.query(`SELECT r.*,row_to_json(p) AS payment_row,row_to_json(a) AS approval_row,row_to_json(t) AS transaction_review
+      const rows = (await tx.query(`SELECT r.*,row_to_json(p) AS payment_row,row_to_json(a) AS approval_row,row_to_json(t) AS transaction_review,row_to_json(i) AS investigation_row
         FROM requests r LEFT JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
         LEFT JOIN approvals a ON a.org_id=r.org_id AND a.request_id=r.id
-        LEFT JOIN transaction_reviews t ON t.org_id=r.org_id AND t.request_id=r.id
+        LEFT JOIN LATERAL (SELECT * FROM transaction_reviews WHERE org_id=r.org_id AND request_id=r.id ORDER BY request_version DESC LIMIT 1) t ON true
+        LEFT JOIN investigations i ON i.org_id=r.org_id AND i.request_id=r.id
         WHERE r.org_id=$1 AND r.project_id IN (SELECT project_id FROM principal_projects WHERE org_id=$1 AND principal_id=$2)
         AND ($3<>'AGENT' OR r.agent_id IN (SELECT id FROM agents WHERE org_id=$1 AND owner_id=$2))
         ORDER BY r.created_at DESC,r.id DESC LIMIT 50`, [principal.orgId, principal.id, principal.role])).rows;
       const ids = rows.map(r => r.id);
       const events = (await tx.query(`SELECT * FROM audit_events WHERE org_id=$1 AND packet->>'resourceId'=ANY($2::text[]) ORDER BY sequence DESC LIMIT 100`, [principal.orgId, ids])).rows;
-      return { catalog, requests: rows.map(r => ({ ...projection(r, r.payment_row, r.approval_row), transactionReview: r.transaction_review, snapshotHash: transactionSnapshot(r,r.payment_row) })), events,
+      return { catalog, requests: rows.map(r => ({ ...projection(r, r.payment_row, r.approval_row), transactionReview: r.transaction_review, investigation: r.investigation_row, snapshotHash: transactionSnapshot(r,r.payment_row) })), events,
         limits: { requests: 50, events: 100, exhaustive: false }, paymentExecution: false };
     });
   }
@@ -302,7 +322,7 @@ export class GateService {
   async catalog(principal: Principal) {
     return transaction(this.db, principal.orgId, async tx => {
       const projects = (await tx.query("SELECT p.* FROM projects p JOIN principal_projects g ON g.org_id=p.org_id AND g.project_id=p.id WHERE g.org_id=$1 AND g.principal_id=$2", [principal.orgId, principal.id])).rows;
-      const agents = (await tx.query(`SELECT a.* FROM agents a JOIN principal_projects g ON g.org_id=a.org_id AND g.project_id=a.project_id WHERE g.org_id=$1 AND g.principal_id=$2 AND ($3 NOT IN ('OPERATOR','AGENT') OR a.owner_id=$2)`, [principal.orgId, principal.id, principal.role])).rows;
+      const agents = (await tx.query(`SELECT a.*,EXISTS(SELECT 1 FROM credentials c WHERE c.org_id=a.org_id AND c.principal_id=a.owner_id AND c.revoked_at IS NULL AND 'request:submit'=ANY(c.capabilities)) AS can_purchase FROM agents a JOIN principal_projects g ON g.org_id=a.org_id AND g.project_id=a.project_id WHERE g.org_id=$1 AND g.principal_id=$2 AND ($3 NOT IN ('OPERATOR','AGENT') OR a.owner_id=$2)`, [principal.orgId, principal.id, principal.role])).rows;
       const budgets = (await tx.query("SELECT b.* FROM budgets b JOIN principal_projects g ON g.org_id=b.org_id AND g.project_id=b.project_id WHERE g.org_id=$1 AND g.principal_id=$2", [principal.orgId, principal.id])).rows;
       const merchants = (await tx.query("SELECT id,name,status FROM merchants WHERE org_id=$1", [principal.orgId])).rows;
       return { projects, agents, budgets, merchants, policy: POLICY, mode: "sandbox", provider: "simulator" };
@@ -311,7 +331,7 @@ export class GateService {
 
   async search(principal: Principal, query: string) {
     requireThat(query.length >= 2 && query.length <= 200, "INVALID_QUERY", "Search requires 2–200 characters.", 400);
-    return transaction(this.db, principal.orgId, async tx => (await tx.query(`SELECT s.id,s.domain,s.source_id,s.dataset_label,s.source_hash FROM source_records s
+    return transaction(this.db, principal.orgId, async tx => (await tx.query(`SELECT s.id,s.domain,s.source_id,s.project_id,s.dataset_label,s.source_hash,s.content->>'title' AS title,s.content->>'kind' AS kind FROM source_records s
       JOIN principal_projects g ON g.org_id=s.org_id AND g.project_id=s.project_id AND g.principal_id=$2
       WHERE s.org_id=$1 AND (strpos(lower(s.source_id),lower($3))>0 OR strpos(lower(s.content::text),lower($3))>0)
       ORDER BY s.id LIMIT 50`, [principal.orgId, principal.id, query])).rows);

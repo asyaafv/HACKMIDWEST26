@@ -18,7 +18,7 @@ export async function listRequests(db:DB,p:Principal,input:z.input<typeof listIn
    JOIN agents a ON a.org_id=r.org_id AND a.id=r.agent_id WHERE r.org_id=$1 AND ($3 NOT IN ('AGENT','OPERATOR') OR a.owner_id=$2)
    AND ($4::uuid IS NULL OR r.project_id=$4) AND ($5::uuid IS NULL OR r.agent_id=$5) AND ($6::text IS NULL OR r.status=$6)
    AND ($7::timestamptz IS NULL OR (r.created_at,r.id)<($7::timestamptz,$8::uuid)) ORDER BY r.created_at DESC,r.id DESC LIMIT $9`,
-   [p.orgId,p.id,p.role,args.project_id??null,args.agent_id??null,args.status??null,cursor?.date??null,cursor?.id??null,args.limit+1])).rows;
+   [p.orgId,p.id,p.capabilities?.includes('investigation:write')?'INVESTIGATOR':p.role,args.project_id??null,args.agent_id??null,args.status??null,cursor?.date??null,cursor?.id??null,args.limit+1])).rows;
   const more=rows.length>args.limit,items=rows.slice(0,args.limit),last=items.at(-1);
   return {items,limit:args.limit,coverage:'authorized requests only',partial:more,next_cursor:more?Buffer.from(JSON.stringify({date:new Date(last.created_at).toISOString(),id:last.id,scope})).toString('base64url'):null};
  });

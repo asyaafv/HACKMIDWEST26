@@ -296,6 +296,10 @@ dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
 .field > input, .field > textarea, .field > select { display: block; width: 100%; margin-top: 8px; padding: 11px 12px; background: var(--field-bg); border: 1px solid var(--field-border); border-radius: 7px; color: var(--text); font-size: 14px; font-weight: 400; line-height: 1.5; }
 .field textarea { resize: vertical; min-height: 80px; }.field input::placeholder, .field textarea::placeholder { color: var(--muted); }.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--orange); }.optional { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 400; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
 .field-help { color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; margin: -4px 0 18px; }
+.purchase-preview { margin: 18px 0; padding: 15px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); }
+.purchase-preview h3 { font-size: 15px; margin-bottom: 8px; }
+.purchase-preview p { color: var(--secondary); font-size: 12px; line-height: 1.6; margin-top: 5px; overflow-wrap: anywhere; }
+.purchase-preview ul { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 5px 15px; margin: 12px 0; padding-left: 18px; color: var(--secondary); font-size: 12px; line-height: 1.5; }
 .portrait-field { padding: 0; border: 0; margin: 22px 0 0; }.portrait-field legend { color: var(--secondary); font-size: 13px; font-weight: 500; }.portrait-picker { margin-top: 13px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }.portrait-choice { position: relative; display: flex; align-items: center; flex-direction: column; cursor: pointer; padding: 9px 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }.portrait-choice:hover { background: var(--surface-raised); }.portrait-choice.selected { border-color: var(--orange); background: var(--selected-row); }.portrait-choice:focus-within { outline: 2px solid var(--orange); outline-offset: 3px; }.portrait-choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }.portrait-choice img { width: 72px; height: 72px; max-width: 100%; object-fit: cover; border-radius: 50%; }.portrait-choice span { font-size: 10px; margin-top: 8px; color: var(--secondary); }
 .form-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 23px; padding-top: 20px; border-top: 1px solid var(--border); }.inline-error { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; color: var(--red); font-size: 13px; line-height: 1.6; }.inline-error svg { flex-shrink: 0; }.demo-callout { display: flex; gap: 10px; padding: 14px; background: var(--surface-raised); color: var(--secondary); font-size: 12px; line-height: 1.7; border-radius: 7px; }.demo-callout svg { flex-shrink: 0; margin-top: 2px; }.demo-note { font-size: 12px; line-height: 1.7; color: var(--muted); margin: 18px 0; }.source-content > p:first-child { font-size: 14px; line-height: 1.8; color: var(--secondary); }.source-content dl { display: grid; grid-template-columns: 80px 1fr; gap: 12px; font-size: 12px; margin-top: 24px; }
 .success-toast, .error-toast { position: fixed; bottom: 22px; right: 24px; z-index: 70; padding: 11px 13px; background: var(--approved-bg); border: 1px solid var(--approved-border); color: var(--green); display: flex; align-items: center; gap: 11px; font-size: 13px; max-width: min(550px, calc(100vw - 32px)); border-radius: 10px; box-shadow: none; }.error-toast { background: var(--blocked-bg); color: var(--red); border-color: var(--blocked-border); }.error-toast > svg, .success-toast > svg { flex-shrink: 0; }.error-toast .icon-button, .success-toast .icon-button { background: transparent; border: 0; }.error-toast ~ .success-toast { bottom: 110px; }
@@ -406,3 +410,13 @@ dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
   .decision-summary-footer { flex-wrap: wrap; }
   .caught-up h2 { font-size: 18px; }
 }
+
+/* Persisted investigation steps reuse the dashboard's existing card and text treatment. */
+.investigation-section { padding: 18px 0; border-bottom: 1px solid rgba(128,128,128,.22); }
+.investigation-badge { font-weight: 700; }
+.investigation-steps { list-style: none; padding: 0; display: grid; gap: 8px; }
+.investigation-steps li { opacity: .65; }
+.investigation-steps li[data-complete="true"] { opacity: 1; }
+.evaluation-history { margin-top: 16px; }
+.evaluation-history summary { cursor: pointer; }
+.evaluation-history article { padding: 12px 0; border-top: 1px solid rgba(128,128,128,.22); }

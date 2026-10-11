@@ -19,7 +19,6 @@ import { hashPassword,verifyPassword,httpAuthenticate } from '../src/sessions.js
 import { enforceHttpCapability } from '../src/capabilities.js';
 import { runGatekeeperScenario,callGateTool } from '../scripts/gatekeeper-scenario.js';
 import { listRequests } from '../src/mcp-context.js';
-import { toolSchemas } from '../src/mcp-schemas.js';
 import type { Proposal } from '../src/contracts.js';
 const port=58000+process.pid%1000;
 const pg=new EmbeddedPostgres({databaseDir:`work/test-identity-${randomUUID()}`,user:'identity_test',password:'unit_test_only',port,persistent:false,postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
@@ -66,7 +65,7 @@ it('uses scrypt with independent salts and rejects wrong passwords',async()=>{
 it('uses real scoped SDK identities, independent finance consent, and actual payment outcome',async()=>{
  const client=await connect(a.token);
  try {
-  const tools=(await client.listTools()).tools;expect(tools.map(t=>t.name)).toHaveLength(10);expect(tools.some(t=>t.name.includes('consent'))).toBe(false);
+  const tools=(await client.listTools()).tools;expect(tools.map(t=>t.name)).toEqual(['gate_list_investigations','gate_start_investigation','gate_submit_evidence','gate_fail_investigation','gate_catalog','gate_search_context','gate_get_context','gate_preview_spend','gate_request_spend','gate_list_requests','gate_get_request']);expect(tools.some(t=>t.name.includes('consent'))).toBe(false);
   await expect(runGatekeeperScenario(client,{proposal,permissionToRecord:false,idempotencyKey:randomUUID()})).rejects.toMatchObject({code:'RECORD_PERMISSION_REQUIRED'});
   const key=randomUUID(),result=await runGatekeeperScenario(client,{proposal,permissionToRecord:true,idempotencyKey:key});const id=(result.request as any).id;
   const repeat=await callGateTool(client,'gate_request_spend',{...proposal,idempotency_key:key}) as any;expect(repeat.id).toBe(id);
@@ -75,9 +74,8 @@ it('uses real scoped SDK identities, independent finance consent, and actual pay
   await expect(service.consent(principal,id,{},randomUUID())).rejects.toMatchObject({code:'FORBIDDEN'});
   const finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`),preview=await service.preview(finance,id,randomUUID());
   const consent=await service.consent(finance,id,{choice:'approve',previewId:preview.id,previewHash:preview.previewHash,expectedVersion:preview.expectedVersion,reason:'Independent test consent',reviewResolutions:preview.decision.reviewRequirements.map(r=>r.code)},randomUUID());
-  await new GateWorker(runtime).runOnce();const payment=await callGateTool(client,'gate_get_payment',{payment_id:consent.paymentId}) as any;
-  expect(payment).toMatchObject({paymentStatus:'SUCCEEDED',holdState:'CAPTURED'});expect(payment.receipt).toBeTruthy();
-  expect((await callGateTool(client,'gate_explain_request',{request_id:id}) as any).citations.length).toBeGreaterThan(0);
+  await new GateWorker(runtime).runOnce();const payment=(await callGateTool(client,'gate_get_request',{request_id:id}) as any).payment;
+  expect(payment).toMatchObject({status:'SUCCEEDED',holdState:'CAPTURED'});expect(payment.receipt).toBeTruthy();
  } finally {await client.close();}
 });
 it('isolates another principal/source and paginates without cross-agent exposure',async()=>{
@@ -103,15 +101,14 @@ it('denies investigator submission and next call after credential revocation or 
  try {
   const result=await client.callTool({name:'gate_request_spend',arguments:{...proposal,agentId:investigator.agentId,idempotency_key:randomUUID()}});expect(result.isError).toBe(true);
   const principal=await authenticate(runtime,`Bearer ${investigator.token}`);await expect(service.create(principal,{...proposal,agentId:investigator.agentId},randomUUID())).rejects.toMatchObject({code:'FORBIDDEN'});
-  await revokeCredential(admin,controls.orgId,investigator.credentialId);await expect(client.callTool({name:'gate_capabilities',arguments:{}})).rejects.toBeDefined();
+  await revokeCredential(admin,controls.orgId,investigator.credentialId);await expect(client.callTool({name:'gate_catalog',arguments:{}})).rejects.toBeDefined();
   await admin.query("UPDATE credentials SET expires_at=now()-interval '1 second' WHERE id=$1",[investigator.credentialId]);await expect(authenticate(runtime,`Bearer ${investigator.token}`)).rejects.toMatchObject({code:'UNAUTHENTICATED'});
  } finally {await client.close();}
 });
-it('rejects absent bearer, wrong Host/Origin, unknown tools and ambiguous payment selectors',async()=>{
+it('rejects absent bearer, wrong Host/Origin and unknown tools',async()=>{
  expect((await app.inject({method:'POST',url:'/mcp',headers:{host:new URL(url).host},payload:{}})).statusCode).toBe(401);
  expect((await app.inject({method:'POST',url:'/mcp',headers:{host:'evil.test',authorization:`Bearer ${a.token}`},payload:{}})).statusCode).toBe(403);
  expect((await app.inject({method:'POST',url:'/mcp',headers:{host:new URL(url).host,origin:'https://evil.test',authorization:`Bearer ${a.token}`},payload:{}})).statusCode).toBe(403);
- expect(()=>toolSchemas.gate_get_payment.parse({request_id:randomUUID(),payment_id:randomUUID()})).toThrow();
  const client=await connect(a.token);try{expect((await client.callTool({name:'gate_consent_request',arguments:{}})).isError).toBe(true);}finally{await client.close();}
 });
 it('creates Secure HttpOnly sessions; enforces CSRF/Origin, logout, expiry and bearer separation',async()=>{
@@ -148,9 +145,9 @@ it('recovers a lost submission response using the original key and retained paym
   const administrator=await authenticate(runtime,`Bearer ${controls.identities.ADMIN!.token}`);
   await service.setPaymentFault(administrator,consent.paymentId!,'TIMEOUT_AFTER_COMMIT',randomUUID(),true);
   await new GateWorker(runtime).runOnce();
-  expect(await callGateTool(client,'gate_get_payment',{request_id:id})).toMatchObject({paymentStatus:'UNKNOWN',holdState:'HELD'});
+  expect((await callGateTool(client,'gate_get_request',{request_id:id}) as any).payment).toMatchObject({status:'UNKNOWN',holdState:'HELD'});
   await service.reconcilePayment(finance,consent.paymentId!,randomUUID());
-  expect(await callGateTool(client,'gate_get_payment',{request_id:id})).toMatchObject({paymentStatus:'SUCCEEDED',holdState:'CAPTURED'});
+  expect((await callGateTool(client,'gate_get_request',{request_id:id}) as any).payment).toMatchObject({status:'SUCCEEDED',holdState:'CAPTURED'});
   expect((await admin.query('SELECT count(*) FROM simulator_transactions WHERE payment_id=$1',[consent.paymentId])).rows[0].count).toBe('1');
  } finally {await client.close();}
 });

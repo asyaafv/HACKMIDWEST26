@@ -3,9 +3,10 @@ import type { Principal } from './contracts.js';
 import { requireThat } from './errors.js';
 export type ScopedPrincipal = Principal & { capabilities?: string[]; authMethod?: 'bearer' | 'session' };
 export const TOOL_CAPABILITIES: Record<string,string> = {
- gate_capabilities:'catalog:read', gate_catalog:'catalog:read', gate_search_context:'context:read', gate_get_context:'context:read',
+ gate_catalog:'catalog:read', gate_search_context:'context:read', gate_get_context:'context:read',
  gate_preview_spend:'request:preview', gate_request_spend:'request:submit', gate_get_request:'request:read',
- gate_explain_request:'request:read', gate_list_requests:'request:read', gate_get_payment:'payment:read',
+ gate_list_requests:'request:read', gate_list_investigations:'investigation:write', gate_start_investigation:'investigation:write',
+ gate_submit_evidence:'investigation:write', gate_fail_investigation:'investigation:write',
 };
 // Preserve Chat 2's additive service names as aliases for the same narrow operations.
 export function normalizeCapabilities(capabilities: string[]): string[] {
@@ -21,7 +22,7 @@ export function capabilityAccess(principal: ScopedPrincipal, capability: string)
 }
 export function enforceHttpCapability(principal: ScopedPrincipal, method: string, route: string) {
  if (route.endsWith('/dashboard')) capabilityAccess(principal, 'catalog:read');
- const capability = route.endsWith('/me') ? undefined : route.endsWith('/reconcile') ? 'payment:reconcile' : route.endsWith('/fault') ? 'development:fault' : route.includes('/consent') || route.endsWith('/review') || /\/requests\/[^/]+\/preview$/.test(route) ? 'finance:consent'
+ const capability = route.includes('/investigation/') && method === 'POST' ? 'investigation:write' : route.endsWith('/me') ? undefined : route.endsWith('/reconcile') ? 'payment:reconcile' : route.endsWith('/fault') ? 'development:fault' : route.includes('/consent') || route.endsWith('/review') || /\/requests\/[^/]+\/preview$/.test(route) ? 'finance:consent'
  : route.endsWith('/cancel') ? 'request:cancel' : route.includes('/policy/preview') ? 'request:preview'
  : route.endsWith('/requests') && method === 'POST' ? 'request:submit' : route.includes('/sources') ? 'context:read'
  : route.includes('/payments') ? 'payment:read' : route.includes('/catalog') ? 'catalog:read' : 'request:read';

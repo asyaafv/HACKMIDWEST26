@@ -1,9 +1,23 @@
+# Investigation lifecycle addition
+
+See gatekeeper-investigations.md for MCP 0.4.0, scoped claim/evidence/failure routes,
+report schemas and immutable reevaluation history. New proposals wait for an
+investigation before human review; missing evidence/hard denials prevent approval.
+The demo transaction investigation endpoint is an explicitly labeled local test.
+
 # Current no-login dashboard contract
 
 `GET /v1/demo/dashboard` reads the explicitly configured shared demo workspace.
 Returns `data.identity`, catalog, latest 50 requests with linked historical payments,
 `transactionReview`, `snapshotHash`, and 100 related audit events. No browser login
 is required. Other REST and MCP routes remain authenticated.
+
+`GET /v1/demo/sources/search?q=...` returns authorized imported source selectors.
+`POST /v1/demo/purchases` accepts the existing Proposal body and Idempotency-Key.
+It resolves the purchasing agent's owner/provenance server-side, checks the shared
+reviewer's and owner's project grants, and uses the real evidence/policy creation
+service. Returns a request with `origin:SIMULATED_PURCHASE`; creates no payment.
+Host/Origin protections match demo review writes. No actual DevRev agent is invoked.
 
 `POST /v1/demo/transactions/:id/review` requires the configured Host/Origin,
 Idempotency-Key and `{choice:"approve"|"reject", reason, expectedVersion, snapshotHash}`.

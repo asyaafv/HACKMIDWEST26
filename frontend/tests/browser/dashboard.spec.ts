@@ -4,7 +4,7 @@ import { connectFixture } from './backend-fixture';
 test('database-backed empty state and read-only configuration replace the old demo',async({page})=>{
  await connectFixture(page,'/transactions',false);await expect(page.getByRole('heading',{name:'Authorization queue'})).toBeVisible();
  await expect(page.getByRole('heading',{name:'No matching transactions'})).toBeVisible();await expect(page.locator('.topbar')).not.toContainText(/Refresh|Disconnect|CONNECTED/);
- await page.getByRole('link',{name:'Gatekeepers',exact:true}).click();await expect(page.getByRole('button',{name:'Create Gatekeeper',exact:true})).toBeDisabled();
+ await page.getByRole('link',{name:'Gatekeepers',exact:true}).click();await expect(page.getByRole('button',{name:'Simulate purchase',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'Create Gatekeeper',exact:true})).toHaveCount(0);
  await page.getByRole('link',{name:'Policies',exact:true}).click();await expect(page.getByText('VISUAL_TEST_ONLY')).toBeVisible();await expect(page.getByRole('button',{name:'Save policy'})).toHaveCount(0);
 });
 test('backend failure shows an error without login or fixture records',async({page})=>{
@@ -25,7 +25,8 @@ test('clickable agent cards preserve hover feedback and inspect backend records 
  const open = card.getByRole('button', { name: 'Open Procurement-07', exact: true });
  await open.focus(); await open.press('Enter');
  const dialog = page.getByRole('dialog', { name: 'Procurement-07', exact: true });
- await expect(dialog).toContainText('Agent configuration is managed through backend identity provisioning.');
+ await expect(dialog).toContainText('Agent ID');
+ await expect(dialog.getByText('Department', { exact: true })).toBeVisible();
  await expect(dialog.getByRole('textbox')).toHaveCount(0);
  await page.keyboard.press('Escape'); await expect(open).toBeFocused();
  await open.click();
