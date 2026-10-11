@@ -143,15 +143,14 @@ export function AnimationPreview() {
   const [paused, setPaused] = useState(false);
   const [floating, setFloating] = useState(false);
   return <main className="page-main motion-preview">
-    <div className="page-heading"><div><h1>A little more alive.</h1><p>One Gatekeeper. A first look at its personality.</p></div><Link className="button" to="/gatekeepers">Back to Gatekeepers</Link></div>
+    <div className="page-heading"><div><h1>A little more alive.</h1></div><Link className="button" to="/gatekeepers">Back to Gatekeepers</Link></div>
     <div className="motion-workbench">
-      <div className="motion-stage"><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={440} paused={paused} selected={floating} expression={expression} cue={cue} interactive label={`Character ${character} animation preview`} /><span className="motion-stage-note">Move your pointer to catch its eye.</span></div>
-      <section className="motion-controls" aria-label="Animation controls"><h2>Meet your Gatekeeper</h2><label className="character-select">Character<select aria-label="Character" value={character} onChange={e => { setCharacter(Number(e.target.value)); setExpression('idle'); }}>{Array.from({length: 10}, (_, i) => <option key={i} value={i + 1}>Character {i + 1}</option>)}</select></label><p>Blinks, relaxed eyes, and curious glances happen naturally. Select Float to add a more noticeable bob.</p>
+      <div className="motion-stage"><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={440} paused={paused} selected={floating} expression={expression} cue={cue} interactive label={`Character ${character} animation preview`} /></div>
+      <section className="motion-controls" aria-label="Animation controls"><h2>Meet your Gatekeeper</h2><label className="character-select">Character<select aria-label="Character" value={character} onChange={e => { setCharacter(Number(e.target.value)); setExpression('idle'); }}>{Array.from({length: 10}, (_, i) => <option key={i} value={i + 1}>Character {i + 1}</option>)}</select></label>
         <button type="button" className={`button motion-float ${floating ? 'primary' : ''}`} aria-pressed={floating} onClick={() => setFloating(value => !value)}>Float</button>
         <div className="expression-controls">{expressions.map(e => <button type="button" className={`button ${expression === e.value ? 'primary' : ''}`} key={e.value} aria-pressed={expression === e.value} onClick={() => { setExpression(e.value); setCue(c => c + 1); }}>{e.label}</button>)}</div>
         <button type="button" className="button motion-pause" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? 'Resume animation' : 'Pause animation'}</button>
-        <div className="motion-context"><h3>At dashboard size</h3><div><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={112} paused={paused} selected={floating} expression={expression} cue={cue} /><span><strong>Character {character}</strong><small>Same character, same motion.</small></span></div></div>
-        <p className="motion-accessibility">Motion follows your device’s reduced-motion preference.</p>
+        <div className="motion-context"><h3>At dashboard size</h3><div><AnimatedAvatar key={character} character={character} identity={`preview-${character}`} size={112} paused={paused} selected={floating} expression={expression} cue={cue} /><span><strong>Character {character}</strong></span></div></div>
       </section>
     </div>
   </main>;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check } from '@phosphor-icons/react';
 import { ENTRANCE_DURATION, entrancePose } from './entrance-timeline';
 import { createEntranceAudio } from './entrance-audio';
@@ -8,6 +8,9 @@ import './gate-entrance.css';
 // Memory-only: client routing never resets this, while a fresh document does.
 let visitComplete = false;
 
+const EntranceReplayContext = createContext<() => void>(() => {});
+export const useEntranceReplay = () => useContext(EntranceReplayContext);
+
 export function GateEntrance({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(!visitComplete);
   const [visit, setVisit] = useState(0);
@@ -15,15 +18,18 @@ export function GateEntrance({ children }: { children: ReactNode }) {
   const workspace = useRef<HTMLDivElement>(null), overlay = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null), approval = useRef<HTMLDivElement>(null), skip = useRef<HTMLButtonElement>(null);
   const finishRef = useRef<() => void>(() => {});
+  const replay = useCallback(() => {
+    visitComplete = false; setMode('loading'); setVisit(v => v + 1); setActive(true);
+  }, []);
 
   useEffect(() => {
     const restored = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
-      visitComplete = false; setMode('loading'); setVisit(v => v + 1); setActive(true);
+      replay();
     };
     window.addEventListener('pageshow', restored);
     return () => window.removeEventListener('pageshow', restored);
-  }, []);
+  }, [replay]);
 
   useEffect(() => {
     if (!active) return;
@@ -135,7 +141,7 @@ export function GateEntrance({ children }: { children: ReactNode }) {
   }, [active, visit]);
 
   return <>
-    <div ref={workspace} className="entrance-workspace" inert={active}>{children}</div>
+    <EntranceReplayContext.Provider value={replay}><div ref={workspace} className="entrance-workspace" inert={active}>{children}</div></EntranceReplayContext.Provider>
     {active && <div key={visit} ref={overlay} className="gate-entrance" data-mode={mode} role="dialog" aria-modal="true" aria-label="Welcome to Gate" aria-describedby="entrance-description">
       <p className="sr-only" id="entrance-description">A decorative welcome animation. No transaction is being approved. Press Escape or skip to enter the workspace.</p>
       <div className="entrance-backdrop" aria-hidden="true" />

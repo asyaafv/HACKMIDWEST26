@@ -14,7 +14,7 @@ const sourceLabel = {pm:'Issue or ticket',crm:'Account',document:'Document'};
 export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose: () => void }) {
   const { run, busy } = useDemo();
   const [name, setName] = useState(agent?.name ?? ''), [description, setDescription] = useState(agent?.description ?? ''), [department, setDepartment] = useState(agent?.department ?? ''), [avatar, setAvatar] = useState<number | null>(agent?.avatar ?? null), [error, setError] = useState('');
-  return <Dialog title={agent ? 'Edit Gatekeeper' : 'Create Gatekeeper'} description="Give your agent a name, a purpose, and a character." onClose={onClose} busy={busy} wide><form onSubmit={async e => {
+  return <Dialog title={agent ? 'Edit Gatekeeper' : 'Create Gatekeeper'} onClose={onClose} busy={busy} wide><form onSubmit={async e => {
     e.preventDefault(); if (!avatar) { setError('Choose a character portrait.'); return; }
     const input = { name, description, department, avatar };
     if (await run(s => agent ? s.updateGatekeeper(agent.id, input) : s.createGatekeeper(input), agent ? 'Gatekeeper updated.' : 'Gatekeeper created.')) onClose();
@@ -22,7 +22,7 @@ export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose
     <label className="field">Name<input value={name} onChange={e => setName(e.target.value)} autoFocus required maxLength={60} placeholder="e.g. Procurement-08" /></label>
     <label className="field">Description<textarea value={description} onChange={e => setDescription(e.target.value)} required maxLength={500} rows={3} placeholder="Describe what this Gatekeeper is responsible for" /></label>
     <label className="field">Department <span className="optional">Optional</span><select value={department} onChange={e => setDepartment(e.target.value)}><option value="">Choose a department</option>{!departments.includes(department) && department && <option>{department}</option>}{departments.map(d => <option key={d} value={d}>{d[0].toUpperCase() + d.slice(1)}</option>)}</select></label>
-    <fieldset className="portrait-field"><legend>Choose a character</legend><p>All ten original portraits are available. Characters can be shared.</p><div className="portrait-picker">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <label className={`portrait-choice ${avatar === n ? 'selected' : ''}`} key={n}><input type="radio" name="avatar" value={n} checked={avatar === n} onChange={() => { setAvatar(n); setError(''); }} aria-label={`Character ${n}`} /><img src={avatarUrl(n)} alt={`Character ${n}`} width={72} height={72} /><span>Character {n}</span></label>)}</div></fieldset>
+    <fieldset className="portrait-field"><legend>Choose a character</legend><div className="portrait-picker">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <label className={`portrait-choice ${avatar === n ? 'selected' : ''}`} key={n}><input type="radio" name="avatar" value={n} checked={avatar === n} onChange={() => { setAvatar(n); setError(''); }} aria-label={`Character ${n}`} /><img src={avatarUrl(n)} alt={`Character ${n}`} width={72} height={72} /><span>Character {n}</span></label>)}</div></fieldset>
     {error && <ErrorMessage>{error}</ErrorMessage>}<FormFooter busy={busy} onClose={onClose}>{agent ? 'Save changes' : 'Create Gatekeeper'}</FormFooter>
   </form></Dialog>;
 }
@@ -38,7 +38,7 @@ export function RequestForm({ onClose, onCreated, simulation = false }: { onClos
  const source=sources.find(s=>`${s.domain}:${s.source_id}`===sourceId&&s.project_id===project);
  const signature=JSON.stringify({agentId,project,merchantId,amount,category,purpose,sourceId});
  const currentPreview=preview?.signature===signature?preview.result:null;
- return <Dialog title={simulation ? "Simulate purchase" : "Create request"} description="Use the same proposal fields Gate tracks for DevRev: agent, project, merchant, amount, category, purpose, and source record." onClose={onClose} busy={busy||previewing}><form onSubmit={async e=>{
+ return <Dialog title={simulation ? "Simulate purchase" : "Create request"} onClose={onClose} busy={busy||previewing}><form onSubmit={async e=>{
   e.preventDefault();setError('');const source=sources.find(s=>`${s.domain}:${s.source_id}`===sourceId);
   try {if(!project||!source||source.project_id!==project)throw new Error('Choose a purchasing agent and a source in its project.');const amountMinor=minorUnits(amount);
    const proposal={agentId,projectId:project,merchantId,amountMinor,currency:'USD' as const,category,purpose:purpose.trim(),source:{domain:source.domain,sourceId:source.source_id}};

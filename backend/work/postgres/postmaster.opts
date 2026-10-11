@@ -1,1 +1,1 @@
-/Users/asuya/Documents/HACKMIDWEST/HACKMIDWEST26/backend/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres "-D" "work/postgres" "-p" "55432" "-h" "127.0.0.1"
+/Users/adem/Documents/GitHub/HACKMIDWEST26/backend/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres "-D" "work/postgres" "-p" "55432" "-h" "127.0.0.1"
