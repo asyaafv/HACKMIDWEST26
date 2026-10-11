@@ -60,6 +60,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       return {data:{...await service.dashboard(p),identity:{id:p.id,orgId:p.orgId,role:p.role,capabilities:p.capabilities,actorMode:'shared_hackathon_demo'}},meta:{traceId:req.id}};
     });
     demo.get('/sources/search', async req => ({data:{items:await service.search(await demoPrincipal(db,options.demoWorkspace!),String((req.query as any).q ?? ''))},meta:{traceId:req.id}}));
+    demo.post('/purchases/preview', async req => ({data:await service.previewProposal(await demoPrincipal(db,options.demoWorkspace!),req.body),meta:{traceId:req.id}}));
     demo.post('/purchases', async (req,reply) => {
       const result = await simulatePurchase(db,service,await demoPrincipal(db,options.demoWorkspace!),req.body,keySchema.parse(req.headers['idempotency-key']));
       reply.code(201);return {data:result,meta:{traceId:req.id}};

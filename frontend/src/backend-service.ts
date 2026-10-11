@@ -30,6 +30,7 @@ export class BackendService implements DemoDataService {
       decision: r.transactionReview?.choice === 'approve' ? 'Approved' : r.transactionReview?.choice === 'reject' ? 'Blocked' : 'Pending',
       reason: r.transactionReview?.reason, reviewBinding: {version:r.version,snapshotHash:r.snapshotHash},
       risk: r.decision.riskScore, createdAt: r.createdAt, purpose: r.proposal.purpose, project: c.projects.find(p => p.id === r.proposal.projectId)?.name ?? r.proposal.projectId,
+      category: r.proposal.category, source: r.proposal.source, reviewRequirements: r.decision.reviewRequirements,
       paymentMethod: r.payment ? 'Existing PostgreSQL payment' : 'Stored transaction request', workflowStatus: r.workflowStatus, policyVerdict: r.decision.verdict, authorizationStatus: r.transactionReview ? 'REVIEWED' : 'AWAITING_REVIEW',
       backend: r, historicalPayment:r.payment, analysis: {factors:r.decision.factors,missing:r.evidence.missing,policyVersion:r.decision.policyVersion,links:r.evidence.links}, evidence: r.evidence.items.map((e): Evidence => ({ id: e.id, title: String(e.content.title ?? e.sourceId), subtitle: `${e.domain} · ${e.sourceId}`, kind: 'request', text: JSON.stringify(e.content, null, 2), sourceId: e.sourceId, domain: e.domain, sourceHash: e.sourceHash })),
       checks: r.decision.rules.map(rule => ({ id: 'purpose' as const, name: rule.code.replaceAll('_',' '), detail: `${rule.result}${rule.actual ? ` · actual ${rule.actual}` : ''}${rule.threshold ? ` · threshold ${rule.threshold}` : ''}`, passed: rule.result === 'PASS', version: 1 })),

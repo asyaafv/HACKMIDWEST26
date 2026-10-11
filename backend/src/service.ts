@@ -311,7 +311,7 @@ export class GateService {
 
   async search(principal: Principal, query: string) {
     requireThat(query.length >= 2 && query.length <= 200, "INVALID_QUERY", "Search requires 2–200 characters.", 400);
-    return transaction(this.db, principal.orgId, async tx => (await tx.query(`SELECT s.id,s.domain,s.source_id,s.dataset_label,s.source_hash FROM source_records s
+    return transaction(this.db, principal.orgId, async tx => (await tx.query(`SELECT s.id,s.domain,s.source_id,s.project_id,s.dataset_label,s.source_hash,s.content->>'title' AS title,s.content->>'kind' AS kind FROM source_records s
       JOIN principal_projects g ON g.org_id=s.org_id AND g.project_id=s.project_id AND g.principal_id=$2
       WHERE s.org_id=$1 AND (strpos(lower(s.source_id),lower($3))>0 OR strpos(lower(s.content::text),lower($3))>0)
       ORDER BY s.id LIMIT 50`, [principal.orgId, principal.id, query])).rows);

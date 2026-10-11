@@ -33,7 +33,9 @@ or rejection, its reason and the reviewed snapshot; the original request status,
 payment status and budget balances are preserved. No payment worker is started.
 An empty database produces an empty dashboard. To create a labeled demo proposal,
 open Gatekeepers → Simulate purchase. It runs the real policy/evidence engine using
-imported sources; live DevRev investigation remains pending.
+imported sources. The form uses Gate's DevRev proposal fields and shows a read-only
+policy preview before it records the sandbox request. Live DevRev record sync is
+not configured.
 
 Press Ctrl+C to stop services owned by the launcher. Existing history is preserved.
 Logs are in backend/work. `./run-gate.sh --smoke` verifies startup and then stops
