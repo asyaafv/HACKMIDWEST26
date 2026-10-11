@@ -1,4 +1,4 @@
-/** Private PostgreSQL acceptance joins MCP submission, browser finance consent, and real worker receipts. */
+/** Private PostgreSQL acceptance joins MCP submission and main-dashboard enterprise review without payment side effects. */
 import { beforeAll, afterAll, it, expect } from 'vitest';
 import { chromium, type Browser, expect as browserExpect } from '@playwright/test';
 import EmbeddedPostgres from 'embedded-postgres';
@@ -12,7 +12,6 @@ import { Pool, type DB } from '../src/db.js';
 import { migrate } from '../scripts/migrate.js';
 import { prepareDemo, seedControls } from '../scripts/seed.js';
 import { createApp } from '../src/app.js';
-import { GateWorker } from '../src/worker.js';
 import { provisionGatekeeper } from '../src/identity.js';
 import { callGateTool } from '../scripts/gatekeeper-scenario.js';
 const pg = new EmbeddedPostgres({ databaseDir: `work/live-test-${randomUUID()}`, user: 'live_test', password: 'isolated_only', port: 60000 + process.pid % 500, persistent: false, postgresFlags: ['-h','127.0.0.1'], onLog: () => {}, onError: () => {} });
@@ -38,45 +37,50 @@ beforeAll(async () => {
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE });
 });
 afterAll(async () => { await browser?.close(); if (vite && vite.exitCode === null) { const stopped = new Promise(resolve => vite.once('exit', resolve)); vite.kill('SIGTERM'); await stopped; } await app?.close(); await runtime?.end(); await admin?.end(); await pg.stop(); });
-it('MCP proposal appears in the live finance UI and returns a captured worker receipt', async () => {
-  const gatekeeper = await provisionGatekeeper(admin, { orgId: controls.orgId, projectId: controls.projectId, name: 'Integration Gatekeeper' });
-  const client = new Client({ name: 'local Gatekeeper acceptance', version: '1.0.0' });
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${gatekeeper.token}` } } }));
-  try {
-    const tools = (await client.listTools()).tools; expect(tools.some(t => t.name.includes('consent'))).toBe(false);
-    const proposal = { agentId: gatekeeper.agentId, projectId: controls.projectId, merchantId: controls.merchantId, amountMinor: '170000', currency: 'USD', category: 'diagnostics', purpose: 'MCP to browser integration', source: { domain: 'pm', sourceId: 'GATE-ISSUE-101' } };
-    const request = await callGateTool(client, 'gate_request_spend', { ...proposal, idempotency_key: randomUUID() }) as { id: string };
-    const page = await browser.newPage(); page.setDefaultTimeout(5000); await page.goto(`${frontend}/live`);
-    await page.getByLabel('Local bearer token').fill(controls.identities.FINANCE!.token); await page.getByRole('button', { name: 'Connect locally' }).click();
-    await browserExpect(page.getByRole('heading', { name: 'FINANCE workspace' })).toBeVisible();
-    await page.getByRole('button', { name: /MCP to browser integration/ }).click();
-    await page.getByRole('button', { name: 'Generate exact consent preview' }).click();
-    await browserExpect(page.getByRole('heading', { name: 'Review exact purchase' })).toBeVisible();
-    await page.getByLabel('Finance reason').fill('Reviewed exact amount, destination and verified source');
-    for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
-    await page.getByRole('button', { name: 'Authorize exact sandbox purchase' }).click();
-    await browserExpect(page.getByRole('status')).toContainText('Consent recorded');
-    await new GateWorker(runtime).runOnce();
-    await page.getByRole('button', { name: 'Refresh outcome', exact: true }).click();
-    await browserExpect(page.getByText(/Workflow: COMPLETED/)).toBeVisible();
-    const outcome = await callGateTool(client, 'gate_get_request', { request_id: request.id }) as { payment: { status: string; holdState: string; receipt: unknown } };
-    expect(outcome.payment.status).toBe('SUCCEEDED'); expect(outcome.payment.holdState).toBe('CAPTURED'); expect(outcome.payment.receipt).toBeTruthy();
-    expect((await admin.query('SELECT count(*) FROM simulator_transactions')).rows[0].count).toBe('1'); await page.close();
-  } finally { await client.close(); }
+it('main dashboard reviews a real MCP request without payments, jobs, or budget mutations', async () => {
+ const gatekeeper=await provisionGatekeeper(admin,{orgId:controls.orgId,projectId:controls.projectId,name:'Integration Gatekeeper'});
+ const client=new Client({name:'main dashboard acceptance',version:'1.0.0'});
+ await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${gatekeeper.token}`}}}));
+ try {
+  const proposal={agentId:gatekeeper.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Main dashboard MCP request',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}};
+  const request=await callGateTool(client,'gate_request_spend',{...proposal,idempotency_key:randomUUID()}) as {id:string};
+  const page=await browser.newPage();page.setDefaultTimeout(5000);await page.goto(frontend);
+ await browserExpect(page.getByLabel('Local access token')).toBeAttached();
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
+  await page.getByLabel('Local access token').fill(controls.identities.FINANCE!.token);await page.getByRole('button',{name:'Connect to backend'}).click();
+  await browserExpect(page.getByRole('heading',{name:'Workspace overview'})).toBeVisible();
+  await page.getByRole('button',{name:new RegExp(`Open ${request.id}`)}).click();
+  await browserExpect(page.getByText('Main dashboard MCP request',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Approve request',exact:true}).click();
+  await browserExpect(page.getByLabel('Decision reason')).toBeVisible();await page.getByLabel('Decision reason').fill('Reviewed verified context and exact proposal');
+  for(const checkbox of await page.locator('dialog input[type=checkbox]').all())await checkbox.check();
+  await page.getByRole('button',{name:'Record approval'}).click();await browserExpect(page.locator('dialog')).toHaveCount(0);
+  const outcome=await callGateTool(client,'gate_get_request',{request_id:request.id}) as {workflowStatus:string;payment:unknown;authorizationStatus:string};
+  expect(outcome.workflowStatus).toBe('AUTHORIZED');expect(outcome.authorizationStatus).toBe('REVIEWED');expect(outcome.payment).toBeNull();
+  for(const table of ['payments','jobs','simulator_transactions','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
+  expect((await admin.query('SELECT reserved_minor,spent_minor FROM budgets WHERE project_id=$1',[controls.projectId])).rows[0]).toMatchObject({reserved_minor:'0',spent_minor:'0'});
+  expect((await admin.query("SELECT count(*) FROM audit_events WHERE packet->>'event'='review.approved'")).rows[0].count).toBe('1');
+  await page.reload();await browserExpect(page.getByRole('heading',{name:'Connect to Gate'})).toBeVisible();
+  expect(await page.evaluate(()=>JSON.stringify(localStorage))).not.toContain(controls.identities.FINANCE!.token);await page.close();
+ } finally {await client.close();}
 });
-it('a committed proposal with a lost response replays through the UI without duplicate requests', async () => {
-  const page = await browser.newPage(); page.setDefaultTimeout(5000); await page.goto(`${frontend}/live`);
-  await page.getByLabel('Local bearer token').fill(controls.identities.OPERATOR!.token); await page.getByRole('button', { name: 'Connect locally' }).click();
-  await browserExpect(page.getByRole('heading', { name: 'OPERATOR workspace' })).toBeVisible();
-  await page.getByLabel('Assigned Gatekeeper').selectOption(controls.agentId); await page.getByLabel('Merchant', { exact: true }).selectOption(controls.merchantId);
-  await page.getByLabel('Purpose', { exact: true }).fill('Lost frontend response'); await page.getByLabel('Amount in USD').fill('200.00');
-  await page.getByLabel('Search imported evidence').fill('GATE-ISSUE-101'); await page.getByRole('button', { name: 'Search sources' }).click();
-  await browserExpect(page.getByLabel('Authorized source').locator('option')).toHaveCount(2); await page.getByLabel('Authorized source').selectOption('pm:GATE-ISSUE-101');
-  await page.route('**/v1/requests', async route => { if (route.request().method() !== 'POST') return route.continue(); await route.fetch(); await route.abort('failed'); await page.unroute('**/v1/requests'); });
-  await page.getByRole('button', { name: 'Submit sandbox request' }).click(); await browserExpect(page.getByRole('alert')).toContainText('Response lost');
-  await page.getByRole('button', { name: 'Submit sandbox request' }).click(); await browserExpect(page.getByRole('status')).toContainText('Request recorded');
-  await page.getByRole('button', { name: 'Submit sandbox request' }).evaluate(button => { const form = (button as HTMLButtonElement).form!; form.requestSubmit(); form.requestSubmit(); });
-  await browserExpect(page.getByRole('status')).toContainText('Request recorded');
-  expect((await admin.query("SELECT count(*) FROM requests WHERE proposal->>'purpose'='Lost frontend response'")).rows[0].count).toBe('1');
-  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(controls.identities.OPERATOR!.token); await page.close();
+it('main request form retries a committed lost response without duplicate records or fixture fallback',async()=>{
+ const page=await browser.newPage();page.setDefaultTimeout(5000);await page.goto(frontend);
+ await browserExpect(page.getByLabel('Local access token')).toBeAttached();
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
+ await page.getByLabel('Local access token').fill(controls.identities.OPERATOR!.token);await page.getByRole('button',{name:'Connect to backend'}).click();
+ await browserExpect(page.getByRole('heading',{name:'Workspace overview'})).toBeVisible();await page.getByRole('button',{name:'Create request',exact:true}).click();
+ await page.getByLabel('Gatekeeper',{exact:true}).selectOption(controls.agentId);await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('200.01');await page.getByLabel('Business purpose',{exact:true}).fill('Lost main-dashboard response');
+ await page.getByLabel('Find supporting evidence').fill('GATE-ISSUE-101');await page.getByRole('button',{name:'Search sources'}).click();
+ await browserExpect(page.getByLabel('Supporting source').locator('option')).toHaveCount(2);await page.getByLabel('Supporting source').selectOption('pm:GATE-ISSUE-101');
+ await page.route('**/v1/requests',async route=>{if(route.request().method()!=='POST')return route.continue();await route.fetch();await route.abort('failed');await page.unroute('**/v1/requests');});
+ await page.getByRole('button',{name:'Check and submit'}).click();await browserExpect(page.locator('dialog [role=alert]').first()).toContainText('Response lost');
+ await page.getByRole('button',{name:'Check and submit'}).click();await browserExpect(page.locator('dialog')).toHaveCount(0);
+ expect((await admin.query("SELECT count(*) FROM requests WHERE proposal->>'purpose'='Lost main-dashboard response'")).rows[0].count).toBe('1');
+ await browserExpect(page.getByText('Lost main-dashboard response',{exact:true})).toBeVisible();
+ expect((await admin.query('SELECT count(*) FROM payments')).rows[0].count).toBe('0');
+ const id=(await admin.query("SELECT id FROM requests WHERE proposal->>'purpose'='Lost main-dashboard response'")).rows[0].id;
+ const forbidden=await fetch(`${base}/v1/requests/${id}/review`,{method:'POST',headers:{authorization:`Bearer ${controls.identities.OPERATOR!.token}`,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:'{}'});expect(forbidden.status).toBe(403);
+ expect((await fetch(`${base}/dev-console`)).status).toBe(404);await page.close();
 });

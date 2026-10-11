@@ -1,7 +1,6 @@
 /** Fastify REST boundary: validates requests, authenticates bearer identities, and returns safe errors. */
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
-import { readFile } from "node:fs/promises";
 import { transaction } from "./db.js";
 import { roleAccess } from "./auth.js";
 import { listRequests } from "./mcp-context.js";
@@ -19,7 +18,7 @@ import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; devConsole?: boolean; browserHosts?: string[] } = {}) {
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[] } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db);
@@ -42,32 +41,21 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     req.log.error({ code: "INTERNAL_ERROR", traceId: req.id }, "Gate request failed");
     return reply.code(500).send({ error: { code: "INTERNAL_ERROR", message: "Request could not be completed." }, meta: { traceId: req.id } });
   });
-  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox" }));
+  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox", dashboard: true, paymentExecution: !!options.paymentExecution }));
   app.get("/health/ready", async () => { await db.query("SELECT 1"); return { ok: true, service: "gate-backend" }; });
   const browserHosts = options.browserHosts ?? ["localhost:8000", "127.0.0.1:8000"];
-  if (options.devConsole) {
-    for (const [asset, type] of [["index.html", "text/html"], ["console.js", "text/javascript"], ["client.js", "text/javascript"], ["style.css", "text/css"]]) {
-      app.get(asset === "index.html" ? "/dev-console" : `/dev-console/${asset}`, async (req, reply) => {
-        requireThat(["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.ip), "FORBIDDEN", "Console requires a local connection.", 403);
-        requireThat(browserHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "Host not allowed.", 403);
-        const path = new URL(`../dev-console/${asset}`, import.meta.url);
-        const body = await readFile(path).catch(() => readFile(new URL(`../../dev-console/${asset}`, import.meta.url)));
-        return reply.type(type!).header("Cache-Control", "no-store").header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'").header("X-Content-Type-Options", "nosniff").send(body);
-      });
-    }
-  }
   app.register(authRoutes, { prefix: "/v1", db, origins, hosts: browserHosts });
   app.register(async api => {
     api.addHook("onRequest", async req => { if (!req.headers.authorization && !req.headers.cookie) requireThat(false, "UNAUTHENTICATED", "A valid credential or session is required.", 401);
       if (req.url.split("?")[0]?.endsWith("/fault")) {
-        requireThat(!!options.devConsole && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.ip) && browserHosts.includes(req.headers.host ?? ""), "FORBIDDEN", "Fault controls require explicit local development mode.", 403);
+        requireThat(!!options.developmentFaults && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.ip) && browserHosts.includes(req.headers.host ?? ""), "FORBIDDEN", "Fault controls require explicit local development mode.", 403);
       }
       const p = await httpAuthenticate(db, req, origins, browserHosts); enforceHttpCapability(p, req.method, req.routeOptions.url ?? req.url); });
     const principal = (req: any) => httpAuthenticate(db, req, origins, browserHosts);
     const key = (req: any) => keySchema.parse(req.headers["idempotency-key"]);
     const id = (req: any) => idSchema.parse(req.params.id);
     const wrap = (data: unknown, traceId: string) => ({ data, meta: { traceId, mode: "sandbox", provider: "simulator" } });
-    registerPaymentRoutes(api, { service, principal, development: !!options.devConsole });
+    registerPaymentRoutes(api, { service, principal, development: !!options.developmentFaults });
     api.get("/me", async req => { const p = await principal(req); return wrap({ id: p.id, role: p.role, orgId: p.orgId, approvalLimitMinor: p.approvalLimitMinor, capabilities: p.capabilities, authMethod: p.authMethod }, req.id); });
     api.get("/schemas", async req => wrap({ contractVersion: "1.0.0", schemas: apiSchemas }, req.id));
     api.get("/integrations", async req => {
@@ -78,7 +66,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
         const lastSeen = heartbeatTable ? (await tx.query("SELECT max(last_seen_at) AS last_seen FROM worker_heartbeats")).rows[0]?.last_seen : null;
         return { datasets, worker: { status: lastSeen && Date.now() - new Date(lastSeen).getTime() < 60000 ? "LOCAL_ONLY" : "OFFLINE", lastSeenAt: lastSeen ?? null, scope: "process heartbeat; not proof of this tenant's payment completion" } };
       });
-      return wrap({ ...data, database: { status: "LOCAL_ONLY", checkedAt: new Date().toISOString() }, devrev: { status: "NOT_CONFIGURED", reason: "No recorded remote tool-call proof." }, payment: { status: "LOCAL_ONLY", provider: "simulator", mode: "sandbox" }, consoleEnabled: !!options.devConsole }, req.id);
+      return wrap({ ...data, database: { status: "LOCAL_ONLY", checkedAt: new Date().toISOString() }, devrev: { status: "NOT_CONFIGURED", reason: "No recorded remote tool-call proof." }, payment: { status: "LOCAL_ONLY", provider: "simulator", mode: "sandbox" }, consoleEnabled: false, paymentExecution: !!options.paymentExecution }, req.id);
     });
     api.get("/approvals", async req => { const p = await principal(req); roleAccess(p, ["FINANCE"]); const page = await listRequests(db, p, { status: "AWAITING_CONSENT", limit: 50, cursor: (req.query as any).cursor }); return wrap({ items: page.items.map(r => ({ id: r.id, workflowStatus: r.status, createdAt: r.created_at, agentId: r.agent_id, projectId: r.project_id, amountMinor: r.amount_minor })), limit: page.limit, nextCursor: page.next_cursor, exhaustive: !page.partial }, req.id); });
     api.get("/sources/detail", async req => {
@@ -92,6 +80,8 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       const result = await transaction(db, p.orgId, tx => getSourceContext(tx, p, projectId, source));
       requireThat(result, "NOT_FOUND", "Context not found.", 404); return wrap(result, req.id);
     });
+    api.get("/dashboard", async req => wrap(await service.dashboard(await principal(req)), req.id));
+    api.post("/requests/:id/review", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req), false), req.id));
     api.get("/catalog", async req => wrap(await service.catalog(await principal(req)), req.id));
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));
     api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
@@ -99,7 +89,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
     api.get("/requests/:id/evidence", async req => wrap((await service.get(await principal(req), id(req))).evidence, req.id));
     api.post("/requests/:id/preview", async req => wrap(await service.preview(await principal(req), id(req), key(req)), req.id));
-    api.post("/requests/:id/consent", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req)), req.id));
+    api.post("/requests/:id/consent", async req => { requireThat(!!options.paymentExecution, "EXECUTION_DISABLED", "Gate records enterprise reviews without executing payments.", 403); return wrap(await service.consent(await principal(req), id(req), req.body, key(req)), req.id); });
     api.post("/requests/:id/cancel", async req => wrap(await service.cancel(await principal(req), id(req), key(req)), req.id));
     api.get("/requests/:id/events", async req => wrap(await service.events(await principal(req), id(req)), req.id));
     api.get("/requests/:id/explanation", async req => wrap(await service.explain(await principal(req), id(req)), req.id));

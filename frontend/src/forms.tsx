@@ -1,7 +1,10 @@
+/** Request and identity forms; connected requests are validated by the authoritative backend. */
 import { useState } from 'react';
 import { useDemo } from './context';
-import { avatarUrl, departments, merchants } from './data';
+import { avatarUrl, departments } from './data';
 import { Dialog, ErrorMessage, FormFooter } from './components';
+import { api, BackendService } from './backend-service';
+import { minorUnits } from './live-api';
 import type { Gatekeeper, Priority } from './types';
 
 export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose: () => void }) {
@@ -20,22 +23,24 @@ export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose
   </form></Dialog>;
 }
 
+/** Purchase proposals use assigned projects, authorized sources, and exact integer USD cents. */
 export function RequestForm({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
-  const { state, run, busy } = useDemo();
-  const [agentId, setAgent] = useState(state!.agents.find(a => a.active)?.id ?? ''), [merchantId, setMerchant] = useState('github'), [amount, setAmount] = useState(''), [priority, setPriority] = useState<Priority>('P2'), [project, setProject] = useState(''), [purpose, setPurpose] = useState(''), [error, setError] = useState('');
-  const active = state!.agents.filter(a => a.active);
-  return <Dialog title="Create request" description="Propose a purchase and check it against your local demo policies." onClose={onClose} busy={busy}><form onSubmit={async e => {
-    e.preventDefault();
-    if (!/^\d+(\.\d{1,2})?$/.test(amount)) { setError('Enter a USD amount with no more than two decimal places.'); return; }
-    let created = '';
-    const ok = await run(async s => { const next = await s.createRequest({ agentId, merchantId, amount: Math.round(Number(amount) * 100), priority, project, purpose }); created = next.transactions[0].id; return next; }, 'Demo request created.');
-    if (ok) { onClose(); onCreated(created); }
-  }}>
-    <label className="field">Gatekeeper<select required value={agentId} onChange={e => setAgent(e.target.value)}>{!active.length && <option value="">No active Gatekeepers</option>}{active.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
-    <label className="field">Merchant<select value={merchantId} onChange={e => setMerchant(e.target.value)}>{merchants.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-    <div className="form-grid"><label className="field">Amount (USD)<input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} required placeholder="0.00" autoFocus /></label><label className="field">Priority<select value={priority} onChange={e => setPriority(e.target.value as Priority)}><option value="P2">P2 · Normal</option><option value="P1">P1 · High</option><option value="P0">P0 · Urgent</option></select></label></div>
-    <label className="field">Project<input value={project} onChange={e => setProject(e.target.value)} required maxLength={100} placeholder="e.g. Engineering expansion" /></label>
-    <label className="field">Business purpose<textarea value={purpose} onChange={e => setPurpose(e.target.value)} required maxLength={500} rows={3} placeholder="Explain why this purchase is needed" /></label>
-    {error && <ErrorMessage>{error}</ErrorMessage>}<p className="demo-note">Demo only. Submitting creates a local record and evaluation; no purchase or payment is executed.</p><FormFooter busy={busy || !active.length} onClose={onClose}>Check and submit</FormFooter>
-  </form></Dialog>;
+ const {state,run,busy}=useDemo();const merchants=state!.merchants??[];
+ const active=state!.agents.filter(a=>a.active&&a.ownerId===state!.identity?.id);
+ const [agentId,setAgent]=useState(active[0]?.id??''),[merchantId,setMerchant]=useState(merchants[0]?.id??''),[amount,setAmount]=useState(''),[purpose,setPurpose]=useState(''),[query,setQuery]=useState(''),[sourceId,setSource]=useState(''),[sources,setSources]=useState<{domain:'pm'|'crm'|'document';source_id:string}[]>([]),[error,setError]=useState('');
+ const [started,setStarted]=useState(false);
+ const project=active.find(a=>a.id===agentId)?.projectId;
+ return <Dialog title="Create request" description="Evaluate the business reason against backend evidence and policy." onClose={onClose} busy={busy}><form onSubmit={async e=>{
+  e.preventDefault();setError('');const source=sources.find(s=>`${s.domain}:${s.source_id}`===sourceId);
+  try {if(!project||!source)throw new Error('Choose an assigned Gatekeeper and authorized source.');const amountMinor=minorUnits(amount);let id='';const ok=await run(async service=>{if(!started){(service as BackendService).newRequest();setStarted(true);}const next=await service.createRequest({agentId,merchantId,amount:Number(amountMinor),priority:'P2' as Priority,project,purpose,source:{domain:source.domain,sourceId:source.source_id}});id=next.transactions[0].id;return next;},'Backend request created.');if(ok){onClose();onCreated(id);}}catch(e){setError(e instanceof Error?e.message:'Request failed.');}
+ }}>
+  <label className="field">Gatekeeper<select aria-label="Gatekeeper" value={agentId} onChange={e=>setAgent(e.target.value)} required>{active.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+  <label className="field">Merchant<select aria-label="Merchant" value={merchantId} onChange={e=>setMerchant(e.target.value)} required>{merchants.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+  <label className="field">Amount (USD)<input aria-label="Amount (USD)" inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} required/></label>
+  <p>Project: {state!.catalog?.projects.find(p=>p.id===project)?.name??'Select an assigned Gatekeeper'}</p>
+  <label className="field">Business purpose<textarea aria-label="Business purpose" value={purpose} onChange={e=>setPurpose(e.target.value)} required maxLength={1000}/></label>
+  <label className="field">Find supporting evidence<input aria-label="Find supporting evidence" value={query} onChange={e=>setQuery(e.target.value)} maxLength={200}/></label><button className="button" type="button" disabled={busy||query.length<2} onClick={()=>{void api.call<{items:typeof sources}>(`/sources/search?q=${encodeURIComponent(query)}`).then(r=>setSources(r.items)).catch(e=>setError(e.message));}}>Search sources</button>
+  <label className="field">Supporting source<select aria-label="Supporting source" value={sourceId} onChange={e=>setSource(e.target.value)} required><option value="">Select source</option>{sources.map(s=><option key={`${s.domain}:${s.source_id}`} value={`${s.domain}:${s.source_id}`}>{s.domain} · {s.source_id}</option>)}</select></label>
+  {error&&<ErrorMessage>{error}</ErrorMessage>}<p>No payment is created or executed.</p><FormFooter busy={busy||!active.length} onClose={onClose}>Check and submit</FormFooter>
+ </form></Dialog>;
 }

@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
+import { mockBackend, connectExistingFixture } from './backend-fixture';
 
 test.use({ reducedMotion: 'no-preference' });
 
@@ -20,6 +21,7 @@ async function released(page: Page) {
 
 test('full sequence finishes, allows navigation, and replays on refresh', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await mockBackend(page);
   await freeze(page); await page.goto('/overview'); await scene(page);
   await expect(page.getByRole('button', { name: 'Skip intro' })).toBeFocused();
   expect(await page.locator('.entrance-workspace').evaluate(e => (e as HTMLElement).inert)).toBe(true);
@@ -31,6 +33,7 @@ test('full sequence finishes, allows navigation, and replays on refresh', async 
   }
   await page.clock.fastForward(5800 - previous); await released(page);
   await expect(page.locator('#main-content')).toBeFocused();
+  await connectExistingFixture(page);
   await page.getByRole('link', { name: 'Gatekeepers', exact: true }).click();
   await expect(page).toHaveURL(/gatekeepers/); await released(page);
   await page.reload(); await scene(page);
@@ -95,19 +98,23 @@ test('hidden document expiry, context loss, and preference changes release resou
 });
 
 test('mobile completes without overflow or a hidden-logo flight', async ({ page }) => {
+  await mockBackend(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await freeze(page); await page.goto('/'); await scene(page);
   await page.clock.fastForward(4900);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.clock.fastForward(1000); await released(page);
+  await connectExistingFixture(page);
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('link', { name: 'Overview', exact: true })).toBeVisible();
 });
 
-test('direct mobile request keeps its own scroll lock and focus after the welcome', async ({ page }) => {
+test('direct mobile request keeps its own scroll lock and focus after welcome and login', async ({ page }) => {
+  await mockBackend(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await freeze(page); await page.goto('/transactions'); await scene(page);
+  await freeze(page); await page.goto('/transactions?request=REQ-1842'); await scene(page);
   await page.clock.fastForward(5900);
+  await connectExistingFixture(page);
   await expect(page.locator('.detail-panel')).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
   expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe('');

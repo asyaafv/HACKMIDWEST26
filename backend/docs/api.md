@@ -61,3 +61,24 @@ Keys: 8–128 characters matching `[A-Za-z0-9:_-]`. Persist one key in memory fo
 400 invalid input; 401 missing/expired/revoked authentication; 403 capability/role/Origin/CSRF denial; 404 missing/inaccessible; 409 STALE_PREVIEW, STALE_EVIDENCE, IDEMPOTENCY_CONFLICT, INVALID_STATE, ALREADY_DISPATCHED; 422 POLICY_BLOCKED, REVIEW_UNRESOLVED, CONFIGURATION_UNAVAILABLE; 429 rate limit; 500 safe internal failure. Show message and trace ID. No retryable boolean is currently emitted; do not infer safe payment mutation retries from a network error.
 
 Default rate limit is 60 requests/minute per IP. The console polls only active requests, every ten seconds, pauses when hidden, skips unchanged detailed projections and stops at terminal states. Coordinate polling across profiles behind one IP. Production frontend should use bounded backoff and respect 429; never invent progress or paid state.
+
+## Current main-dashboard and enterprise review contract
+
+The temporary backend console is removed. `/dev-console` and its assets return
+404. The main frontend uses authenticated `GET /dashboard`: catalog, latest 50
+scoped complete request projections, latest 100 associated audit events, explicit
+nonexhaustive limits and `paymentExecution:false`. No secret credentials are returned.
+
+`POST /requests/:id/review` accepts the same exact preview/version/hash/reason and
+reviewResolutions body as consent, with a retained Idempotency-Key. It requires
+independent FINANCE authority and applies the same evidence/configuration/limit
+checks. Approval records an approval, AUTHORIZED request and review.approved event;
+it creates no payment/job/reservation. With no payment, authorizationStatus is
+REVIEWED. Rejection records REJECTED. This is an enterprise decision, not a provider
+payment authorization token. Normal `/consent` execution is disabled with 403
+EXECUTION_DISABLED; legacy simulator tests can explicitly opt in in-process.
+
+The launcher does not start a worker. Existing payment records remain available
+through scoped read paths. Agent/policy editing and arbitrary database resets are
+not exposed by the dashboard. Prior console/worker instructions above describe
+historical simulator acceptance, not the current product entry point.
