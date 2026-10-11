@@ -1,0 +1,145 @@
+/* Compact controls get more feedback; wide controls stay anchored in the layout. */
+:where(button, a.button, a.text-link, a.plain-link, .nav-item, .profile) {
+  --hover-scale: 1.025;
+  --hover-lift: -1px;
+  transform-origin: center;
+  transition:
+    scale 160ms cubic-bezier(.16, 1, .3, 1),
+    translate 160ms cubic-bezier(.16, 1, .3, 1),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+:where(.icon-button, .row-open, .profile) {
+  --hover-scale: 1.075;
+}
+
+:where(.new-request, .filter-button, .segmented button, .entrance-skip) {
+  --hover-scale: 1.035;
+}
+
+:where(.workspace-button, .nav-item, .evidence-row, .evidence-source,
+  .review-row, .policy-rule, .search-results button,
+  .workspace-popover button, .policy-editor .button, .review-actions .button) {
+  --hover-scale: 1.008;
+  --hover-lift: 0px;
+}
+
+:where(.queue-tabs > button:not(.new-request), .panel-tabs button) {
+  --hover-scale: 1.02;
+  --hover-lift: 0px;
+  transform-origin: center bottom;
+}
+
+:where(.text-link, .plain-link, .request-meta button) {
+  --hover-scale: 1.015;
+  --hover-lift: 0px;
+  transform-origin: left center;
+}
+
+/* A full-card native button keeps the card keyboard-accessible without nesting its actions. */
+.gatekeeper-card {
+  position: relative;
+  transition: scale 180ms cubic-bezier(.16, 1, .3, 1),
+    translate 180ms cubic-bezier(.16, 1, .3, 1),
+    background-color 150ms ease, border-color 150ms ease;
+}
+
+.gatekeeper-open {
+  --hover-scale: 1;
+  --hover-lift: 0px;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+}
+
+.gatekeeper-open:disabled { opacity: 1; }
+.gatekeeper-open:focus-visible { outline: none; }
+.gatekeeper-card:has(.gatekeeper-open:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-color: var(--orange-border);
+}
+
+.gatekeeper-bottom > div {
+  position: relative;
+  z-index: 2;
+}
+
+:where(.gatekeeper-card, .transaction-table) .animated-avatar {
+  transition: scale 180ms cubic-bezier(.16, 1, .3, 1),
+    translate 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gatekeeper-card:has(.gatekeeper-open:not(:disabled)):hover {
+    scale: 1.015;
+    translate: 0 -3px;
+    background-color: var(--surface-raised);
+    border-color: var(--orange-border);
+  }
+
+  .gatekeeper-card:has(.gatekeeper-open:not(:disabled)):hover .animated-avatar {
+    scale: 1.055;
+    translate: 0 -2px;
+  }
+
+  .transaction-table td:first-child .entity:hover .animated-avatar {
+    scale: 1.1;
+    translate: 0 -2px;
+  }
+
+  :where(button, a.button, a.text-link, a.plain-link, .nav-item, .profile)
+    :where(svg) {
+    transition: translate 180ms cubic-bezier(.16, 1, .3, 1);
+  }
+
+  :where(button, a.button, a.text-link, a.plain-link, .nav-item, .profile):not(:disabled):not([aria-disabled="true"]):hover {
+    scale: var(--hover-scale);
+    translate: 0 var(--hover-lift);
+    transition-duration: 220ms, 220ms, 150ms, 150ms, 150ms;
+  }
+
+  :where(.workspace-button, .workspace-popover button, .panel-tabs button):not(:disabled):hover {
+    background-color: var(--surface-raised);
+  }
+
+  :where(.row-open, .request-meta button):not(:disabled):hover {
+    color: var(--orange);
+  }
+
+  :where(.text-link, .plain-link, .row-open, .evidence-source):not(:disabled):not([aria-disabled="true"]):hover > svg:last-child {
+    translate: 2px 0;
+  }
+}
+
+/* Full-width actions need less expansion, including on small laptops with a mouse. */
+@media (max-width: 767px) {
+  :where(.decision-summary-header > .button, .decision-preview-row > .button,
+    .page-action .button, .form-footer .button) {
+    --hover-scale: 1.015;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gatekeeper-card, :where(.gatekeeper-card, .transaction-table) .animated-avatar {
+    scale: none !important;
+    translate: none !important;
+  }
+
+  :where(button, a.button, a.text-link, a.plain-link, .nav-item, .profile):hover {
+    scale: none !important;
+    translate: none !important;
+  }
+
+  :where(button, a.button, a.text-link, a.plain-link, .nav-item, .profile) svg {
+    translate: none !important;
+  }
+}

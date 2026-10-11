@@ -22,7 +22,7 @@ export class LiveApi {
         credentials: 'same-origin', cache: 'no-store', body: body === undefined ? undefined : JSON.stringify(body) });
     } catch { throw new Error(action ? 'Response lost. Retry the identical action; its key is retained.' : 'Backend unavailable.'); }
     const result = await response.json();
-    if (!response.ok) throw new Error(`${result.error?.code ?? response.status}: ${result.error?.message ?? 'Request failed'} · trace ${result.meta?.traceId ?? 'unavailable'}`);
+    if (!response.ok) throw new Error(`${result.error?.code ?? response.status}: ${result.error?.message ?? 'Request failed'}, trace ${result.meta?.traceId ?? 'unavailable'}`);
     return result.data as T;
   }
 }

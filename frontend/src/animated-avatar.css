@@ -1,4 +1,4 @@
-.animated-avatar { position: relative; display: inline-block; overflow: hidden; background: #08090e; vertical-align: middle; }
+.animated-avatar { position: relative; display: inline-block; overflow: hidden; background: var(--bg); vertical-align: middle; }
 .animated-avatar svg { display: block; width: 100%; height: 100%; transform-origin: center; transform: scale(.975); animation: none; animation-play-state: paused; }
 .animated-avatar[data-selected="true"] { animation: selected-avatar-float 3.6s linear infinite; animation-play-state: paused; will-change: transform; }
 .animated-avatar[data-selected="true"][data-running="true"] { animation-play-state: running; }
@@ -31,4 +31,4 @@
 .animation-preview-link { margin: -8px 0 20px; }
 
 .character-select { display: flex; align-items: center; gap: 12px; margin-top: 18px; color: var(--secondary); font-size: 13px; }
-.character-select select { flex: 1; min-width: 0; background: var(--field-bg, #0b151d); color: var(--text); border: 1px solid var(--border); padding: 9px 12px; border-radius: 7px; }
+.character-select select { flex: 1; min-width: 0; background: var(--field-bg); color: var(--text); border: 1px solid var(--border); padding: 9px 12px; border-radius: 7px; }

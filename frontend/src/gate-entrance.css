@@ -1,31 +1,43 @@
 .entrance-workspace { min-height: 100svh; }
 .gate-entrance {
   --intro-backdrop: 1;
+  /* Keep the user's green binary welcome on its original dark canvas. */
+  --bg: #1d1e22;
+  --surface: #343232;
+  --surface-raised: #3e3d40;
+  --text: #f4f4f5;
+  --secondary: #b8b8be;
+  --field-border: #5b5b63;
+  --focus: #e5e5e8;
+  --green: #acc6b4;
+  --approved-bg: #28352c;
+  --approved-border: #526a59;
+  color-scheme: dark;
   position: fixed;
   inset: 0;
   z-index: 1000;
   isolation: isolate;
   overflow: hidden;
-  color: #eff9f4;
+  color: var(--text);
 }
 .entrance-backdrop {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 46%, rgba(15, 25, 25, .88) 0%, rgba(13, 20, 21, .73) 36%, rgba(15, 20, 23, .42) 74%);
+  background: var(--bg);
   opacity: var(--intro-backdrop);
 }
 .entrance-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
 .gate-entrance[data-mode="scene"] .entrance-canvas { opacity: 1; }
 .entrance-static { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; font-size: 17px; font-weight: 500; }
 .entrance-static img { width: 112px; height: 112px; border-radius: 50%; }
-.entrance-static svg { color: #6bf5b2; }
+.entrance-static svg { color: var(--green); }
 .gate-entrance[data-mode="scene"] .entrance-static { display: none; }
-.entrance-approval { position: absolute; top: calc(50% + min(31vh, 285px)); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0; color: #8cffbe; font-size: 16px; font-weight: 500; letter-spacing: .015em; pointer-events: none; }
-.entrance-check { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #50c38c; border-radius: 50%; background: #112d22; }
-.entrance-skip { position: absolute; right: 32px; bottom: 28px; display: flex; gap: 15px; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid #64716f; border-radius: 8px; background: #162020; color: #e0e9e7; font-size: 12px; }
-.entrance-skip span { font-size: 10px; color: #b1c4bd; }
-.entrance-skip:hover { background: #23322e; border-color: #95b7a7; }
-.entrance-skip:focus-visible { outline: 2px solid #b0efd2; outline-offset: 4px; }
+.entrance-approval { position: absolute; top: calc(50% + min(31vh, 285px)); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0; color: var(--green); font-size: 16px; font-weight: 500; letter-spacing: .015em; pointer-events: none; }
+.entrance-check { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--approved-border); border-radius: 50%; background: var(--approved-bg); }
+.entrance-skip { position: absolute; right: 32px; bottom: 28px; display: flex; gap: 15px; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 12px; }
+.entrance-skip span { font-size: 10px; color: var(--secondary); }
+.entrance-skip:hover { background: var(--surface-raised); border-color: var(--secondary); }
+.entrance-skip:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 @media (max-width: 1023px) {
   .entrance-approval { top: calc(50% + min(22vw, 180px) + 58px); }
   .entrance-skip { bottom: max(20px, env(safe-area-inset-bottom)); right: 20px; }
