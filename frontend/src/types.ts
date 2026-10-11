@@ -8,7 +8,9 @@ export interface Policy { id: PolicyKind; name: string; description: string; ena
 export interface PolicyCheck { id: PolicyKind; name: string; detail: string; passed: boolean; version: number }
 export interface Evidence { id: string; title: string; subtitle: string; kind: 'vendor' | 'request' | 'project' | 'budget' | 'purpose'; text: string; sourceId?: string; domain?: string; sourceHash?: string }
 export interface Investigation {status:'WAITING'|'INVESTIGATING'|'EVIDENCE_RECEIVED'|'EVALUATED'|'FAILED';mode:null|'LOCAL_TEST'|'GATEKEEPER';run_id:string|null;started_at:string|null;evidence_received_at:string|null;evaluated_at:string|null;lease_until:string|null;failure_reason:string|null}
+export interface RiskAssessment { computedBy:'BACKEND_POLICY';modelVersion:string;scoreType:'RULE_POINTS';score:number;maximum:number;reviewThreshold:number;level:'LOW'|'REVIEW_REQUIRED'|'BLOCKED';lowRisk:boolean;summary:string }
 export interface Transaction {
+  riskAssessment?:RiskAssessment;
   canApprove?:boolean;investigation?:Investigation|null;unresolvedQuestions?:string[];previousReview?:{choice:string;reason:string};
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;

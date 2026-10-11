@@ -914,6 +914,68 @@
                   "REJECT"
                 ]
               },
+              "riskScore": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "riskAssessment": {
+                "type": "object",
+                "properties": {
+                  "computedBy": {
+                    "type": "string",
+                    "const": "BACKEND_POLICY"
+                  },
+                  "modelVersion": {
+                    "type": "string"
+                  },
+                  "scoreType": {
+                    "type": "string",
+                    "const": "RULE_POINTS"
+                  },
+                  "score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "maximum": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reviewThreshold": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "LOW",
+                      "REVIEW_REQUIRED",
+                      "BLOCKED"
+                    ]
+                  },
+                  "lowRisk": {
+                    "type": "boolean"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "computedBy",
+                  "modelVersion",
+                  "scoreType",
+                  "score",
+                  "maximum",
+                  "reviewThreshold",
+                  "level",
+                  "lowRisk",
+                  "summary"
+                ],
+                "additionalProperties": false
+              },
               "executionAllowed": {
                 "type": "boolean"
               },
@@ -942,6 +1004,7 @@
             },
             "required": [
               "verdict",
+              "riskScore",
               "executionAllowed",
               "requiresHumanConsent",
               "reviewRequirements"
@@ -1199,6 +1262,68 @@
                   "REJECT"
                 ]
               },
+              "riskScore": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "riskAssessment": {
+                "type": "object",
+                "properties": {
+                  "computedBy": {
+                    "type": "string",
+                    "const": "BACKEND_POLICY"
+                  },
+                  "modelVersion": {
+                    "type": "string"
+                  },
+                  "scoreType": {
+                    "type": "string",
+                    "const": "RULE_POINTS"
+                  },
+                  "score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "maximum": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reviewThreshold": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "LOW",
+                      "REVIEW_REQUIRED",
+                      "BLOCKED"
+                    ]
+                  },
+                  "lowRisk": {
+                    "type": "boolean"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "computedBy",
+                  "modelVersion",
+                  "scoreType",
+                  "score",
+                  "maximum",
+                  "reviewThreshold",
+                  "level",
+                  "lowRisk",
+                  "summary"
+                ],
+                "additionalProperties": false
+              },
               "executionAllowed": {
                 "type": "boolean"
               },
@@ -1227,6 +1352,7 @@
             },
             "required": [
               "verdict",
+              "riskScore",
               "executionAllowed",
               "requiresHumanConsent",
               "reviewRequirements"

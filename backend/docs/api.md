@@ -1,6 +1,6 @@
 # Investigation lifecycle addition
 
-See gatekeeper-investigations.md for MCP 0.4.0, scoped claim/evidence/failure routes,
+See gatekeeper-investigations.md for MCP 0.4.1, scoped claim/evidence/failure routes,
 report schemas and immutable reevaluation history. New proposals wait for an
 investigation before human review; missing evidence/hard denials prevent approval.
 The demo transaction investigation endpoint is an explicitly labeled local test.
@@ -13,6 +13,11 @@ Returns `data.identity`, catalog, latest 50 requests with linked historical paym
 is required. Other REST and MCP routes remain authenticated.
 
 `GET /v1/demo/sources/search?q=...` returns authorized imported source selectors.
+`GET /v1/demo/transactions/:id/validation` reruns backend evidence and policy checks.
+It returns the saved and current decisions, `status:VALID|CHANGED`, change reasons,
+the request version and timestamp, and the backend risk model and weights. It is
+read-only and preserves archived decisions and reviews. The authenticated equivalent
+is `GET /v1/requests/:id/validation` with `request:read` and project scope.
 `POST /v1/demo/purchases` accepts the existing Proposal body and Idempotency-Key.
 It resolves the purchasing agent's owner/provenance server-side, checks the shared
 reviewer's and owner's project grants, and uses the real evidence/policy creation
@@ -69,6 +74,12 @@ Credential scopes use `payment:reconcile` / `development:fault`, with narrow com
 ```
 
 Categories: diagnostics / incident_response. Source domains: pm / crm / document. UUID examples are placeholders. Money is positive integer USD cents as a string, capped at 99,999,999 by the runtime schema. Parse decimal USD with integer arithmetic; reject fractional cents, exponent/comma formats and negatives. Do not use binary floating point or round user input. Source context is synthetic evidence, while purchase parameters/reasons are user proposals. Synthetic dataset 1.0.0 uses historical reference time 2026-10-10T12:00:00Z; preview and worker TTL use operational time.
+
+Every new evaluation includes `decision.riskAssessment`: backend model/version,
+rule-point score, maximum, review threshold, `level:LOW|REVIEW_REQUIRED|BLOCKED`,
+`lowRisk` and an explanation. LOW returns verdict APPROVE; individual review rules,
+incomplete evidence and hard denials override a low score. Scores are not probabilities.
+The backend policy owns all weights; the frontend only displays returned values.
 
 ## Exact finance consent
 

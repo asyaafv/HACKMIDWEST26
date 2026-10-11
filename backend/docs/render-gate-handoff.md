@@ -1,5 +1,16 @@
 # Gate Render and DevRev handoff
 
+## Current DevRev organization
+
+The DevRev team URL is `https://app.devrev.ai/maplestudio-playground-10-193711`.
+Render's `DEVREV_MCP_ORG_ID` is `17WZM4zcjj`. The existing email and scoped Gate
+credential mapping are retained. The connector uses
+`https://hackmidwest26.onrender.com/mcp`; neither the Gate database organization
+nor the global DevRev API endpoint changes with the team URL.
+
+The hosted binding was updated through Render's Save and deploy action, reusing
+the existing deployed commit. The observations below describe the earlier setup.
+
 Observed October 10, 2026. The deployed Render web service is
 `https://hackmidwest26.onrender.com` at commit `ed0766f`.
 

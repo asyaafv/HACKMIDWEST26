@@ -18,6 +18,13 @@ describe("deterministic policy", () => {
     expect(evaluate(input("100001")).verdict).toBe("REVIEW");
     expect(evaluate(input()).requiresHumanConsent).toBe(false);
   });
+  it("returns an explicit backend approval recommendation for complete low-risk evidence", () => {
+    expect(evaluate(input("20000"))).toMatchObject({ verdict: "APPROVE", riskScore: 0, requiresHumanConsent: false,
+      riskAssessment: { computedBy: "BACKEND_POLICY", scoreType: "RULE_POINTS", level: "LOW", lowRisk: true } });
+    const denied = input("20000"); denied.merchantStatus = "DENIED";
+    expect(evaluate(denied)).toMatchObject({ verdict: "REJECT", riskScore: 0,
+      riskAssessment: { level: "BLOCKED", lowRisk: false } });
+  });
   it("denies one cent above the agent cap regardless of low risk", () => {
     expect(evaluate(input("500000")).verdict).toBe("REVIEW");
     expect(evaluate(input("500001")).verdict).toBe("REJECT");

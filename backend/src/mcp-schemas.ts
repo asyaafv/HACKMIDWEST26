@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { proposalSchema,idSchema,keySchema } from './contracts.js';
 import { startInvestigationSchema,submitEvidenceSchema,failInvestigationSchema } from './investigation-contracts.js';
 import { listInput } from './mcp-context.js';
-export const SERVER_VERSION='0.4.0';
+export const SERVER_VERSION='0.4.1';
 export const toolSchemas={
  gate_list_investigations:z.object({limit:z.number().int().min(1).max(50).default(20)}).strict(),
  gate_start_investigation:startInvestigationSchema.extend({request_id:idSchema,idempotency_key:keySchema}),
@@ -15,6 +15,6 @@ export const toolSchemas={
  gate_preview_spend:proposalSchema,
  gate_request_spend:proposalSchema.extend({idempotency_key:keySchema}),
  gate_list_requests:listInput,
- gate_get_request:z.object({request_id:idSchema}).strict(),
+ gate_get_request:z.object({request_id:idSchema,validate_decision:z.boolean().optional()}).strict(),
 };
 export const toolOutputSchema=z.object({data:z.unknown(),mode:z.literal('sandbox'),provider:z.literal('simulator'),trace_id:z.string(),server_version:z.string(),dataset_version:z.null()});

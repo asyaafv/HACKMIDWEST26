@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "transport": "stateless Streamable HTTP",
   "authentication": "Gate bearer; server-owned identity",
   "mode": "sandbox",
@@ -864,6 +864,9 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "validate_decision": {
+            "type": "boolean"
           }
         },
         "required": [

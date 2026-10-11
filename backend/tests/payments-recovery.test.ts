@@ -78,9 +78,20 @@ describe("payments recovery", () => {
     expect(second.decision.reviewRequirements).toContainEqual({ code: "DUPLICATE_BUSINESS_INTENT", resolution: "HUMAN_JUDGMENT" });
     expect(second.decision.verdict).toBe("REVIEW");
   });
+  it("flags a second recorded simulation before either request is approved or paid", async () => {
+    const first = await service.create(operator, proposal, randomUUID(), "SIMULATED_PURCHASE");
+    expect(first.decision.reviewRequirements.some((r: { code: string }) => r.code === "DUPLICATE_BUSINESS_INTENT")).toBe(false);
+    const secondPreview = await service.previewProposal(operator, proposal);
+    expect(secondPreview.decision.reviewRequirements).toContainEqual({ code: "DUPLICATE_BUSINESS_INTENT", resolution: "HUMAN_JUDGMENT" });
+    const second = await service.create(operator, proposal, randomUUID(), "SIMULATED_PURCHASE");
+    expect(second.id).not.toBe(first.id);
+    expect(second.decision.factors).toContainEqual({ code: "DUPLICATE_INTENT", points: 20 });
+    expect((await admin.query("SELECT count(*) FROM requests WHERE origin='SIMULATED_PURCHASE'")).rows[0].count).toBe("2");
+    expect((await admin.query("SELECT count(*) FROM payments")).rows[0].count).toBe("0");
+  });
   it("serializes concurrent finance consent against the live budget", async () => {
     await admin.query("UPDATE budgets SET limit_minor=250000");
-    const requests = await Promise.all([service.create(operator, proposal, randomUUID()), service.create(operator, proposal, randomUUID())]);
+    const requests = await Promise.all([service.create(operator, proposal, randomUUID()), service.create(operator, { ...proposal, purpose: "Separate budget race" }, randomUUID())]);
     const previews = await Promise.all(requests.map(r => service.preview(finance, r.id, randomUUID())));
     const results = await Promise.allSettled(requests.map((r, i) => service.consent(finance, r.id,
       { choice: "approve", previewId: previews[i]!.id, previewHash: previews[i]!.previewHash,

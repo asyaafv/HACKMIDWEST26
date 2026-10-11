@@ -34,7 +34,7 @@ newer claims. Request locks serialize claim/review/reevaluation. Idempotency key
 and writes commit together. No payment/provider/network operation runs in these
 transactions. Requests linked to payments cannot be rewritten by investigation.
 
-Authenticated MCP server version 0.4.0 adds four tools to the existing seven:
+Authenticated MCP server version 0.4.1 includes four investigation tools alongside the existing seven:
 
 - gate_list_investigations: {limit}; oldest waiting, failed or expired proposals
   within granted projects; bounded, not exhaustive.
@@ -60,6 +60,14 @@ relationships and actor/tenant overrides are rejected. Omitted graph context is
 independently collected by Gate. Question text cannot authorize spending; unresolved
 questions make required evidence incomplete. An LLM never submits a verdict or risk
 score. Source instructions remain data.
+
+After `gate_submit_evidence`, return `data.decision.verdict`, `riskScore`, and
+`riskAssessment.summary` to the user, including a low-risk APPROVE recommendation.
+Never replace the backend verdict or calculate a probability in the DevRev skill.
+For an existing request, call `gate_get_request` with `validate_decision:true` to
+receive a read-only `validation` result containing current backend checks. Report
+VALID or CHANGED, the current verdict and risk explanation. APPROVE remains a
+policy recommendation requiring separate human consent.
 
 External DevRev evidence must first be ingested through an approved server-side
 import/connector into source_records/source_links. This contract does not trust
@@ -91,6 +99,9 @@ Shared demo endpoints:
 - POST /v1/demo/transactions/:id/investigation {expectedVersion} runs the local
   test against imported context. Stable derived keys recover a lost response.
 - GET /v1/demo/transactions/:id/history returns scoped evaluation history.
+- GET /v1/demo/transactions/:id/validation reruns current evidence and backend policy,
+  preserving the saved evaluation. The frontend's Validate decision button displays
+  the comparison, recommendation and server-provided risk algorithm.
 
 Shared demo actions retain exact Host/Origin checks and fixed server-owned tenant
 and finance identity. Credentials are never supplied by the browser. LOCAL_TEST
@@ -100,11 +111,12 @@ not its external provider or the identity of a human in a chat.
 ## Deployment and actual DevRev handoff
 
 Apply migration 060 before starting the new API revision. Refresh connector tool
-discovery to version 0.4.0. Provision a dedicated investigator:true credential and
+discovery to version 0.4.1. Provision a dedicated investigator:true credential and
 store it only in the DevRev connector's secret configuration; existing read-only
 credentials are not silently expanded. Update the actual custom skill to poll the
 queue, claim, retrieve context, submit exact hashes/links/questions, record failures
-and recover by request ID. Record remote traces before claiming live DevRev success.
+and recover by request ID. Refresh to 0.4.1 for optional decision validation and
+backend risk summaries. Record remote traces before claiming live DevRev success.
 
 Local acceptance uses real PostgreSQL, MCP SDK and browser calls. It covers claims,
 expiry fencing, forged/stale evidence, failed/retried investigations, reevaluation

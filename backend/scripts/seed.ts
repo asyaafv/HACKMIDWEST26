@@ -44,11 +44,17 @@ export async function prepareDemo(db: InstanceType<typeof Pool>) {
   const root = resolve("data/synthetic");
   const manifest = JSON.parse(await readFile(resolve(root, "manifest.json"), "utf8"));
   const imported = await importEvidence(db, orgId, mainProjectId, root, manifest, restrictedProjectId);
+  // A separate immutable manifest extends existing installations without changing their source hashes.
+  const expansionManifest = JSON.parse(await readFile(resolve(root, "expansion-manifest.json"), "utf8"));
+  const expansion = await importEvidence(db, orgId, mainProjectId, root, expansionManifest, restrictedProjectId);
   if (controls) {
     await mkdir("work", { recursive: true, mode: 0o700 });
     await writeFile("work/demo-credentials.json", JSON.stringify({ ...controls, restrictedProjectId }, null, 2), { mode: 0o600, flag: "wx" });
   }
-  return { orgId, projectId: mainProjectId, restrictedProjectId, records: imported.records, verifiedLinks: imported.verifiedLinks, datasetLabel: imported.datasetLabel, manifestHash: imported.manifestHash };
+  return { orgId, projectId: mainProjectId, restrictedProjectId,
+    records: imported.records + expansion.records, verifiedLinks: imported.verifiedLinks + expansion.verifiedLinks,
+    datasets: [{ label: imported.datasetLabel, manifestHash: imported.manifestHash },
+      { label: expansion.datasetLabel, manifestHash: expansion.manifestHash }] };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const db = new Pool({ connectionString: process.env.DATABASE_URL });
