@@ -38,14 +38,13 @@ export function InvestigationPanel({transaction}:{transaction:Transaction}){
  const [history,setHistory]=useState<Evaluation[]>([]),[historyError,setHistoryError]=useState('');
  useEffect(()=>{if(!inv)return;let active=true;api.call<{items:Evaluation[]}>(authenticated?`/requests/${transaction.id}/history`:`/demo/transactions/${transaction.id}/history`).then(r=>{if(active){setHistory(r.items);setHistoryError('');}}).catch(e=>{if(active)setHistoryError(e.message);});return()=>{active=false;};},[transaction.id,transaction.reviewBinding?.version,transaction.decision,authenticated,!!inv]);
  if(authenticated){const authorized=['OPERATOR','ADMIN'].includes(state!.identity!.role)&&state!.identity!.capabilities.includes('request:read');
-  const sameVersion=detail?.run.snapshot.version===transaction.reviewBinding?.version;
   return <section className="investigation-section" aria-label="Gatekeeper investigation">
    <h3>Gatekeeper investigation</h3><p className="investigation-badge" role="status">{detail?.run.status??'Not started'}</p>
    <p>Read-only DevRev review. Financial approval remains with an independent human.</p>
    {availability?.blockers.map(code=><p key={code} className="demo-note">{coordinatorBlockers[code]??code}</p>)}
    {!authorized&&<p className="demo-note">An authorized OPERATOR or ADMIN with request access must start this review.</p>}
    {coordinatorError&&<p className="inline-error" role="alert">{coordinatorError}</p>}
-   <button type="button" className="button" disabled={busy||starting||!authorized||!availability?.ready||sameVersion||detail?.run.status==='RUNNING'} onClick={()=>void start()}>{starting?'Starting DevRev review…':'Run DevRev review'}</button>
+   <button type="button" className="button" disabled={busy||starting||!authorized||!availability?.ready||!!detail} onClick={()=>void start()}>{starting?'Starting DevRev review…':'Run DevRev review'}</button>
    {detail&&<><p>Run ID: {detail.run.id}</p>
     <ol className="investigation-steps">{detail.stages.map(stage=><li key={stage.id} data-complete={stage.status==='SUCCEEDED'}>
      <strong>{['Purchase Authorization','Risk & Fraud','Approval Manager'][stage.ordinal-1]}: {stage.status}</strong>

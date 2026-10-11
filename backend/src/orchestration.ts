@@ -7,11 +7,11 @@ import type { Principal } from './contracts.js';
 import { keySchema } from './contracts.js';
 import { requestRow } from './service.js';
 import type { GateService } from './service.js';
-import { capabilityAccess } from './capabilities.js';
+import { capabilityAccess, ORCHESTRATION_READ_ONLY_CANONICAL_NAMES, ORCHESTRATION_READ_ONLY_TOOLS } from './capabilities.js';
 import { requireThat } from './errors.js';
 import { hash } from './hash.js';
 import { agentEvent,canonicalTool,gateEnvelopes,invocationPayload,dispatchAsync,scrub } from './devrev-async.mjs';
-import { AGENT_IDS,DEVREV_ORG,factsFromRequest,needsHuman,stageMessage,validateFinal,escalationDraft,type OrchestrationSettings } from './orchestration-contracts.js';
+import { AGENT_IDS,DEVREV_ORG,factsFromRequest,stageMessage,validateFinal,escalationDraft,type OrchestrationSettings } from './orchestration-contracts.js';
 
 const metadataSchema=z.object({phase:z.literal('gate-orchestration-2'),orgId:z.string().uuid(),requestId:z.string().uuid(),
  runId:z.string().uuid(),stageId:z.string().uuid(),ordinal:z.number().int().min(1).max(3),promptHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
@@ -22,6 +22,21 @@ const eventSchema=z.object({agent:z.string().max(200),session:z.string().regex(/
   skill_triggered:z.object({skill_name:z.string().max(200),args:z.record(z.string(),z.unknown()).optional()}).optional(),
   skill_executed:z.object({skill_name:z.string().max(200),output:z.unknown()}).optional()}).optional()});
 const terminal=new Set(['SUCCEEDED','FAILED','TIMED_OUT']);
+function gateToolEnvelopes(value:any,depth=0):any[] {
+ if(depth>12||value==null)return [];
+ if(typeof value==='string') {
+  if(value.length>262144)return [];
+  try{return gateToolEnvelopes(JSON.parse(value),depth+1);}catch{return [];}
+ }
+ if(typeof value!=='object'||value.isError===true)return [];
+ if(value.mode==='sandbox'&&value.provider==='simulator'&&typeof value.trace_id==='string')return [value];
+ return Object.values(value).flatMap(child=>gateToolEnvelopes(child,depth+1));
+}
+function uniqueEnvelopes(value:any) {
+ const byTrace=new Map<string,any>();
+ for(const envelope of gateToolEnvelopes(value))if(z.string().uuid().safeParse(envelope.trace_id).success)byTrace.set(envelope.trace_id,envelope);
+ return [...byTrace.values()];
+}
 export class OrchestrationCoordinator {
  constructor(private db:DB,private service:GateService,private settings:OrchestrationSettings,private transport:typeof fetch=fetch){}
  private access(p:Principal) {
@@ -41,19 +56,59 @@ export class OrchestrationCoordinator {
   const agentResponse=await this.transport('https://api.devrev.ai/internal/ai-agents.get',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),
    headers:{Authorization:`Bearer ${this.settings.apiToken}`,'Content-Type':'application/json'},body:JSON.stringify({id:stage.agent_id})});
   const agent=agentResponse.ok?(await agentResponse.json() as any).agent:null;
-  // The verified get API exposes the published default, not historical-version inspection.
-  // Fail closed after republishing until the operator reviews and updates the pin.
-  requireThat(agent?.id===stage.agent_id&&agent.default_version_id?.id===stage.agent_version&&Array.isArray(agent.skills)
-   &&agent.skills.length===1&&agent.skills[0]?.name==='GateGetRequest',
-   'SAFE_AGENT_VERSION_REQUIRED','Pinned published default must expose only GateGetRequest.',409);
+  // execute-async has no verified per-run tool allowlist, so the pinned published version
+  // itself must expose exactly the six read-only tools served on /mcp/orchestration.
+  const skills=Array.isArray(agent?.skills)?agent.skills.map((skill:any)=>canonicalTool(skill?.name)):[];
+  requireThat(agent?.id===stage.agent_id&&agent.default_version_id?.id===stage.agent_version&&skills.length===ORCHESTRATION_READ_ONLY_TOOLS.length
+   &&new Set(skills).size===ORCHESTRATION_READ_ONLY_TOOLS.length&&skills.every((name:string)=>ORCHESTRATION_READ_ONLY_CANONICAL_NAMES.has(name)),
+   'SAFE_AGENT_VERSION_REQUIRED','Publish this original agent version with exactly the six approved read-only Gate tools before orchestration.',409);
  }
  async start(p:Principal,requestId:string,key:string,retryOf?:string) {
   this.access(p);keySchema.parse(key);
   requireThat(['OPERATOR','ADMIN'].includes(p.role),'FORBIDDEN','An operator must initiate advisory orchestration.',403);
+  requireThat(!key.startsWith('auto:'),'INVALID_IDEMPOTENCY_KEY','Automatic orchestration keys are reserved.',400);
+  return this.startRun(p,requestId,key,retryOf,false);
+ }
+ async startAutomatic(p:Principal,requestId:string) {
+  this.access(p);requireThat(['OPERATOR','AGENT'].includes(p.role),'FORBIDDEN','Only the purchase owner may queue its automatic advisory review.',403);
+  return this.startRun(p,requestId,`auto:${requestId}`,undefined,true);
+ }
+ async startAutomaticForRequest(orgId:string,requestId:string) {
+  requireThat(orgId===this.settings.gateOrgId,'NOT_FOUND','Orchestration not available for this organization.',404);
+  const purchaser=await transaction(this.db,orgId,async tx=>{
+   const row=(await tx.query(`SELECT r.created_by,r.credential_id,r.status,p.role,p.approval_limit_minor,p.active,
+     gate_credential_capabilities(r.credential_id) AS capabilities
+     ,t.status AS trust_status FROM requests r JOIN principals p ON p.org_id=r.org_id AND p.id=r.created_by
+     LEFT JOIN trust_assessments t ON t.org_id=r.org_id AND t.request_id=r.id
+     WHERE r.org_id=$1 AND r.id=$2`,[orgId,requestId])).rows[0];
+   requireThat(row?.active&&['OPERATOR','AGENT'].includes(row.role),'PURCHASER_UNAVAILABLE','Request owner is unavailable.',409);
+   if(!['AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED'].includes(row.status))return null;
+   if(['QUEUED','SENT'].includes(row.trust_status)||!row.capabilities?.includes('request:read'))return null;
+   return {id:row.created_by,orgId,credentialId:row.credential_id,role:row.role,approvalLimitMinor:row.approval_limit_minor,
+    capabilities:row.capabilities as string[]} as Principal;
+  });
+  if(!purchaser)return {deferred:true};
+  return this.startAutomatic(purchaser,requestId);
+ }
+ private async queuePendingAutomatic() {
+  const candidate=await transaction(this.db,this.settings.gateOrgId,async tx=>(await tx.query(`SELECT r.id FROM requests r
+   WHERE r.org_id=$1 AND r.status IN ('AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED')
+    AND r.decision->'agentReview'->>'status'='PENDING'
+    AND COALESCE(r.decision->'agentReview'->>'runId','')=''
+    AND NOT EXISTS(SELECT 1 FROM payments p WHERE p.org_id=r.org_id AND p.request_id=r.id)
+    AND NOT EXISTS(SELECT 1 FROM trust_assessments t WHERE t.org_id=r.org_id AND t.request_id=r.id AND t.status IN ('QUEUED','SENT'))
+    AND EXISTS(SELECT 1 FROM credentials c WHERE c.org_id=r.org_id AND c.id=r.credential_id AND c.revoked_at IS NULL
+      AND 'request:read'=ANY(gate_credential_capabilities(c.id)))
+   ORDER BY r.created_at,r.id LIMIT 1`,[this.settings.gateOrgId])).rows[0]);
+  if(!candidate)return false;
+  await this.startAutomaticForRequest(this.settings.gateOrgId,candidate.id);
+  return true;
+ }
+ private async startRun(p:Principal,requestId:string,key:string,retryOf:string|undefined,automatic:boolean) {
   requireThat(this.settings.enabled,'ORCHESTRATION_DISABLED','Orchestration is disabled.',409);
-  const snapshot=factsFromRequest(await this.service.get(p,requestId));
   return transaction(this.db,p.orgId,async tx=>{
-   await requestRow(tx,p,requestId);
+   const original=await requestRow(tx,p,requestId,true);
+   if(automatic)requireThat(original.created_by===p.id,'FORBIDDEN','Automatic orchestration is restricted to the purchase owner.',403);
    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${p.orgId}:${p.id}:orchestration:${key}`]);
    const inputHash=hash({requestId,retryOf:retryOf??null});
    const existing=(await tx.query('SELECT id,input_hash FROM orchestration_runs WHERE org_id=$1 AND created_by=$2 AND idempotency_key=$3',[p.orgId,p.id,key])).rows[0];
@@ -62,7 +117,9 @@ export class OrchestrationCoordinator {
     const old=(await tx.query('SELECT * FROM orchestration_runs WHERE org_id=$1 AND id=$2',[p.orgId,retryOf])).rows[0];
     requireThat(old&&old.request_id===requestId&&['FAILED','TIMED_OUT'].includes(old.status),'INVALID_RECOVERY','Only a stopped run can be explicitly restarted.',409);
    }
-   const id=randomUUID();
+   const id=randomUUID(),prepared=await this.service.prepareDevRevReview(tx,p,original,id);
+   const snapshot=factsFromRequest({id:prepared.id,version:prepared.version,workflowStatus:prepared.status,decision:prepared.decision,
+    evidence:prepared.evidence,consentStatus:'NONE',authorizationStatus:'NONE',payment:null,mode:'sandbox',provider:'simulator'});
    await tx.query(`INSERT INTO orchestration_runs(id,org_id,request_id,created_by,idempotency_key,input_hash,snapshot,status,retry_of,created_credential_id)
     VALUES($1,$2,$3,$4,$5,$6,$7,'RUNNING',$8,$9)`,[id,p.orgId,requestId,p.id,key,inputHash,snapshot,retryOf??null,p.credentialId]);
    for(let index=0;index<3;index++) {
@@ -114,6 +171,7 @@ export class OrchestrationCoordinator {
  private async fail(tx:Tx,run:any,stage:any,code:string,timedOut=false,detail:unknown=null) {
   if(run.status!=='RUNNING'||terminal.has(stage.status))return;
   const findings=await this.findings(tx,run);
+  await this.service.failDevRevReview(tx,run,code,findings);
   await tx.query(`UPDATE orchestration_stages SET status=$3,error_code=$4,error_detail=$5,completed_at=now() WHERE org_id=$1 AND id=$2`,
    [run.org_id,stage.id,timedOut?'TIMED_OUT':'FAILED',code,detail===null?null:JSON.stringify(detail)]);
   await tx.query('UPDATE orchestration_runs SET status=$3,error_code=$4,escalation=$5,completed_at=now() WHERE org_id=$1 AND id=$2',
@@ -129,11 +187,14 @@ export class OrchestrationCoordinator {
   catch{await this.fail(tx,run,stage,'INVALID_AGENT_FINDINGS');return;}
   const findings={stage:stage.ordinal,agentId:stage.agent_id,agentVersion:stage.agent_version,sessionId:stage.session_id,
    traceId:stage.tool_result.traceId,backendFacts:stage.tool_result.facts,
-   agentCommentary:{findingCode:assessment.findingCode,summary:assessment.summary,authority:'ADVISORY_ONLY'},financialApproval:false};
+   agentCommentary:{findingCode:assessment.findingCode,summary:assessment.summary,riskSignals:assessment.riskSignals,authority:'ADVISORY_ONLY'},financialApproval:false};
   await tx.query("UPDATE orchestration_stages SET status='SUCCEEDED',findings=$3,completed_at=now() WHERE org_id=$1 AND id=$2",[run.org_id,stage.id,findings]);
   if(stage.ordinal<3)await tx.query('UPDATE orchestration_runs SET current_stage=$3 WHERE org_id=$1 AND id=$2',[run.org_id,run.id,stage.ordinal+1]);
   else {
-   const verified=await this.findings(tx,run),human=verified.some(f=>needsHuman(f.backendFacts));
+   const verified=await this.findings(tx,run),outcome=await this.service.applyDevRevReview(tx,run,verified);
+   // Gate facts captured at run start include its own PENDING review marker.
+   // The final service outcome recomputes policy after removing that marker.
+   const human=outcome.requiresHuman;
    await tx.query('UPDATE orchestration_runs SET status=$3,escalation=$4,completed_at=now() WHERE org_id=$1 AND id=$2',
     [run.org_id,run.id,human?'HUMAN_REVIEW_REQUIRED':'COMPLETED',human?escalationDraft(run.request_id,verified):null]);
   }
@@ -157,7 +218,8 @@ export class OrchestrationCoordinator {
    const request=(await tx.query('SELECT version FROM requests WHERE org_id=$1 AND id=$2',[orgId,run.request_id])).rows[0];
    const allowed=(await tx.query(`SELECT 1 FROM principals p JOIN principal_projects pp ON pp.org_id=p.org_id AND pp.principal_id=p.id
     JOIN requests r ON r.org_id=pp.org_id AND r.project_id=pp.project_id WHERE p.org_id=$1 AND p.id=$2 AND p.active
-    AND p.role IN ('OPERATOR','ADMIN') AND r.id=$3
+    AND (p.role IN ('OPERATOR','ADMIN') OR (p.role='AGENT' AND r.id=$3 AND r.created_by=p.id
+      AND EXISTS(SELECT 1 FROM agents a WHERE a.org_id=r.org_id AND a.id=r.agent_id AND a.owner_id=p.id))) AND r.id=$3
     AND 'request:read'=ANY(gate_credential_capabilities($4))`,[orgId,run.created_by,run.request_id,run.created_credential_id])).rowCount;
    if(!allowed||request?.version!==run.snapshot.version){await this.fail(tx,run,stage,allowed?'STALE_REQUEST':'INITIATOR_ACCESS_REVOKED');return null;}
    const message=stageMessage(run,stage,await this.findings(tx,run)),promptHash=hash(message);
@@ -167,7 +229,7 @@ export class OrchestrationCoordinator {
     WHERE org_id=$1 AND id=$2`,[orgId,stage.id,body,promptHash,this.settings.timeoutSeconds]);
    return {run,stage,body};
   });
-  if(!claimed)return false;
+  if(!claimed)return this.queuePendingAutomatic();
   try{await this.connectionReady(claimed.stage);}
   catch(error){
    await transaction(this.db,orgId,async tx=>{
@@ -208,21 +270,30 @@ export class OrchestrationCoordinator {
     &&(!stage.session_id||stage.session_id===event.session),'INVALID_ORCHESTRATION_EVENT','Stage/session binding mismatch.',409);
    requireThat(stage.status!=='READY','INVALID_ORCHESTRATION_EVENT','Stage has not been dispatched.',409);
    const tool=event.progress?.skill_executed??event.progress?.skill_triggered;
-   const proof=event.progress?.progress_state==='skill_executed'&&canonicalTool(tool?.skill_name)==='gategetrequest'
-    ?gateEnvelopes((tool as any)?.output,m.requestId):[];
-   let toolResult:any=null,proofError:string|undefined;
-   if(proof.length) {
+   const toolName=canonicalTool(tool?.skill_name),executed=event.progress?.progress_state==='skill_executed';
+   const allowedTool=typeof toolName==='string'&&ORCHESTRATION_READ_ONLY_CANONICAL_NAMES.has(toolName);
+   const envelopes=executed&&allowedTool?uniqueEnvelopes((tool as any)?.output):[];
+   const requestProof=toolName==='gategetrequest'?envelopes.filter(envelope=>envelope.data?.id===m.requestId):[];
+   let toolResult:any=null,toolTraceId:string|undefined,proofError:string|undefined;
+   if(executed&&allowedTool) {
     try {
-     const envelope=proof[0],facts=factsFromRequest(envelope.data);
-     requireThat(envelope.access_mode==='orchestration_read_only','UNSAFE_MCP_CONNECTION','Read-only MCP transport is required.',409);
-     requireThat(hash(facts)===hash(run.snapshot),'STALE_REQUEST','Request changed since orchestration start.',409);
-     toolResult={facts,traceId:z.string().uuid().parse(envelope.trace_id),serverVersion:envelope.server_version};
+     requireThat(envelopes.length===1,'MCP_EXECUTION_NOT_CONFIRMED','A successful response from the scoped read-only Gate connection is required.',409);
+     const envelope=envelopes[0];toolTraceId=z.string().uuid().parse(envelope.trace_id);
+     requireThat(envelope.access_mode==='orchestration_read_only'&&typeof envelope.server_version==='string',
+      'UNSAFE_MCP_CONNECTION','The coordinator requires the server-enforced read-only Gate connection.',409);
+     if(toolName==='gategetrequest') {
+      requireThat(requestProof.length===1,'INVALID_GATE_RESULT','GateGetRequest must return the active request.',409);
+      const facts=factsFromRequest(requestProof[0].data);
+      requireThat(hash(facts)===hash(run.snapshot),'STALE_REQUEST','Request changed since orchestration start.',409);
+      toolResult={facts,traceId:toolTraceId,serverVersion:envelope.server_version};
+     }
     }catch(error){proofError=(error as any).code??'INVALID_GATE_RESULT';}
    }
    const ignored=run.status!=='RUNNING'||terminal.has(stage.status);
    const recorded={authenticated:true,agentId:event.agent,sessionId:event.session,type:event.agent_response,
     progressState:event.progress?.progress_state,toolName:tool?.skill_name,
-    requestArgument:typeof (tool as any)?.args?.request_id==='string'?scrub((tool as any).args.request_id).slice(0,40):null,toolResult,
+    requestArgument:typeof (tool as any)?.args?.request_id==='string'?scrub((tool as any).args.request_id).slice(0,40):null,
+    toolTraceId:toolTraceId??null,toolResult,
     message:event.agent_response==='message'?scrub(event.message??''):null,
     error:event.agent_response==='error'?scrub(event.error?.error??'DEVREV_AGENT_ERROR'):proofError??null};
    const inserted=await tx.query('INSERT INTO orchestration_events(org_id,stage_id,event_hash,event,ignored) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
@@ -230,11 +301,11 @@ export class OrchestrationCoordinator {
    if(!inserted.rowCount||ignored)return {processed:false};
    if(new Date(stage.expires_at).getTime()<=Date.now()){await this.fail(tx,run,stage,'DEVREV_TIMEOUT',true);return {processed:true};}
    if(event.agent_response==='error'){await this.fail(tx,run,stage,'DEVREV_AGENT_ERROR',false,recorded.error);return {processed:true};}
-   if(tool&&canonicalTool(tool.skill_name)!=='gategetrequest'){await this.fail(tx,run,stage,'UNEXPECTED_AGENT_TOOL');return {processed:true};}
-   if(event.progress?.progress_state==='skill_triggered'&&((tool as any)?.args?.request_id!==run.request_id||
+   if(tool&&!allowedTool){await this.fail(tx,run,stage,'UNEXPECTED_AGENT_TOOL');return {processed:true};}
+   if(event.progress?.progress_state==='skill_triggered'&&toolName==='gategetrequest'&&((tool as any)?.args?.request_id!==run.request_id||
      ![undefined,false].includes((tool as any)?.args?.validate_decision))){await this.fail(tx,run,stage,'UNEXPECTED_TOOL_INPUT');return {processed:true};}
    if(proofError){await this.fail(tx,run,stage,proofError);return {processed:true};}
-   if(event.progress?.progress_state==='skill_executed'&&!toolResult){await this.fail(tx,run,stage,'MCP_EXECUTION_NOT_CONFIRMED');return {processed:true};}
+   if(executed&&(!toolTraceId||(toolName==='gategetrequest'&&!toolResult))){await this.fail(tx,run,stage,'MCP_EXECUTION_NOT_CONFIRMED');return {processed:true};}
    if(event.agent_response==='message'&&stage.final_result&&stage.final_result!==scrub(event.message??'')) {
     await this.fail(tx,run,stage,'CONFLICTING_FINAL_RESPONSE');return {processed:true};
    }

@@ -9,6 +9,13 @@ const requirementText: Record<string,string> = {
   TRUST_ASSESSMENT_PENDING: 'The vendor trust check is still in progress.',
   TRUST_ASSESSMENT_REQUIRES_REVIEW: 'The vendor trust review needs a human decision.',
   RISK_REQUIRES_REVIEW: 'The policy risk score requires a finance review.',
+  DEVREV_AGENT_REVIEW_PENDING: 'The three required DevRev agent reviews are still running.',
+  DEVREV_AGENT_REVIEW_FAILED: 'DevRev agent review did not complete; an independent human decision is required.',
+  DEVREV_SIGNAL_FRAUD_INDICATOR: 'DevRev flagged a possible fraud indicator; an independent human decision is required.',
+  DEVREV_SIGNAL_EVIDENCE_CONTRADICTION: 'DevRev flagged conflicting evidence; an independent human decision is required.',
+  DEVREV_SIGNAL_DUPLICATE_INTENT: 'DevRev flagged a possible duplicate request; an independent human decision is required.',
+  DEVREV_SIGNAL_PURPOSE_SOURCE_MISMATCH: 'DevRev flagged a mismatch between the purchase purpose and its source; an independent human decision is required.',
+  DEVREV_SIGNAL_POLICY_BYPASS_ATTEMPT: 'DevRev flagged a possible attempt to bypass policy; an independent human decision is required.',
 };
 
 const failedRuleText: Record<string,string> = {

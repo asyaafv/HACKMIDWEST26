@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { seed } from '../../src/data';
-import { approvalRequirementText, decisionExplanation } from '../../src/risk-explanation';
+import { approvalRequirementText, decisionExplanation, requirementExplanation } from '../../src/risk-explanation';
 import { hasCompletedPurchase, transactionStatusLabel } from '../../src/transaction-presentation';
 
 function flaggedRequest() {
@@ -31,4 +31,10 @@ it('calls an authorized human review an approval, not a completed purchase',()=>
   transaction.workflowStatus='AUTHORIZED';transaction.authorizationStatus='REVIEWED';transaction.decision='Approved';transaction.policyVerdict='REVIEW';
   expect(transactionStatusLabel(transaction)).toBe('Approved');
   expect(hasCompletedPurchase(transaction)).toBe(false);
+});
+
+it('explains DevRev findings and holds in the existing review fields',()=>{
+  expect(requirementExplanation('DEVREV_AGENT_REVIEW_PENDING')).toContain('still running');
+  expect(requirementExplanation('DEVREV_SIGNAL_FRAUD_INDICATOR')).toContain('independent human decision');
+  expect(requirementExplanation('DEVREV_SIGNAL_POLICY_BYPASS_ATTEMPT')).toContain('bypass policy');
 });

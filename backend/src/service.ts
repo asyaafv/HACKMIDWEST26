@@ -14,6 +14,7 @@ import { idempotent } from "./idempotency.js";
 import { transactionSnapshot, reviewSchema } from "./transaction-review.js";
 import { queueTrust, trustForRequest } from "./trust-store.js";
 import { GateWorker } from "./worker.js";
+import { applyAgentReview, type AgentReviewState } from './agent-review.js';
 
 export async function requestRow(tx: Tx, principal: Principal, id: string, lock = false) {
   const row = (await tx.query(`SELECT * FROM requests WHERE org_id=$1 AND id=$2 ${lock ? "FOR UPDATE" : ""}`, [principal.orgId, id])).rows[0];
@@ -75,7 +76,95 @@ function evidenceSourceHash(evidence: any) {
 }
 
 export class GateService {
-  constructor(public db: DB, public options: {trustEnabled?:boolean;trustTimeoutSeconds?:number} = {}) {}
+  private automaticReviewStarter?: (orgId:string,requestId:string)=>Promise<unknown>;
+  constructor(public db: DB, public options: {trustEnabled?:boolean;trustTimeoutSeconds?:number;devrevOrchestrationEnabled?:boolean} = {}) {}
+  setAutomaticReviewStarter(starter:(orgId:string,requestId:string)=>Promise<unknown>) { this.automaticReviewStarter=starter; }
+
+  private reviewFor(row:any,evidence=row?.evidence):AgentReviewState|undefined {
+    let review=row?.decision?.agentReview as AgentReviewState|undefined;
+    if(!review&&this.options.devrevOrchestrationEnabled)review={status:'PENDING',signals:[]};
+    if(review?.status==='COMPLETED'&&review.sourceHash&&review.sourceHash!==hash({proposal:row.proposal,evidence}))
+      return {...review,status:'FAILED',errorCode:'AGENT_REVIEW_STALE'};
+    return review;
+  }
+  private withAgentReview(decision:ReturnType<typeof evaluate>,row:any,evidence=row?.evidence):ReturnType<typeof evaluate>&{agentReview?:AgentReviewState} {
+    const review=this.reviewFor(row,evidence);
+    return review?applyAgentReview(decision,review):decision;
+  }
+
+  /** Attach a run to the frozen request and hold policy authorization until all three agents finish. */
+  async prepareDevRevReview(tx:Tx,p:Principal,row:any,runId:string) {
+    const current=this.reviewFor(row);
+    requireThat(row&&['AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED'].includes(row.status), 'INVALID_STATE', 'Only a purchase without completed financial state can enter DevRev review.',409);
+    requireThat(!(current?.status==='PENDING'&&current.runId&&current.runId!==runId),
+      'DEVREV_REVIEW_ALREADY_RUNNING','A DevRev review is already attached to this purchase.',409);
+    requireThat(!(await tx.query('SELECT 1 FROM payments WHERE org_id=$1 AND request_id=$2',[p.orgId,row.id])).rowCount,
+      'FINANCIAL_STATE_EXISTS','A request with a payment cannot enter agent orchestration.',409);
+    requireThat(current?.status!=='COMPLETED','DEVREV_REVIEW_ALREADY_COMPLETE','This request already has a completed DevRev review.',409);
+    const ctx=await context(tx,p,row.proposal,true);
+    const base=await decisionFor(tx,p,row.proposal,ctx,row.evidence.complete,
+      Boolean(row.evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+    const review:AgentReviewState={status:'PENDING',runId,reviewedVersion:row.version,evidenceHash:row.evidence.bundleHash,
+      sourceHash:hash({proposal:row.proposal,evidence:row.evidence}),signals:[]};
+    const decision=applyAgentReview(base,review),version=row.version+1;
+    const status=decision.verdict==='REJECT'?'REJECTED':decision.reviewRequirements.some((r:any)=>r.resolution==='NEW_EVIDENCE')?'AWAITING_EVIDENCE':'AWAITING_CONSENT';
+    await tx.query('UPDATE requests SET decision=$3,status=$4,version=$5 WHERE org_id=$1 AND id=$2',[p.orgId,row.id,decision,status,version]);
+    await tx.query('INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [randomUUID(),p.orgId,row.id,version,row.proposal,hash(row.proposal),row.evidence,hash(row.evidence),decision,hash(decision)]);
+    await appendAudit(tx,p.orgId,p.id,'devrev.review_started',row.id,{runId,version,readOnly:true});
+    return {...row,decision,status,version};
+  }
+
+  /** Merge verified structured findings into Gate's policy result and optionally auto-authorize eligible low risk. */
+  async applyDevRevReview(tx:Tx,run:any,stageFindings:any[]) {
+    const row=(await tx.query('SELECT * FROM requests WHERE org_id=$1 AND id=$2 FOR UPDATE',[run.org_id,run.request_id])).rows[0];
+    requireThat(row&&row.version===run.snapshot.version&&row.decision?.agentReview?.status==='PENDING'
+      &&row.decision.agentReview.runId===run.id,'STALE_REQUEST','Request changed during DevRev review.',409);
+    const owner=(await tx.query('SELECT * FROM principals WHERE org_id=$1 AND id=$2 AND active',[run.org_id,row.created_by])).rows[0];
+    const scope=(await tx.query('SELECT 1 FROM principal_projects WHERE org_id=$1 AND principal_id=$2 AND project_id=$3',[run.org_id,row.created_by,row.project_id])).rowCount;
+    requireThat(owner&&scope&&['OPERATOR','AGENT'].includes(owner.role),'PURCHASER_UNAVAILABLE','The request owner is no longer authorized.',409);
+    const purchaser:Principal={id:owner.id,orgId:run.org_id,credentialId:row.credential_id,role:owner.role,
+      approvalLimitMinor:owner.approval_limit_minor,capabilities:['request:read']};
+    const ctx=await context(tx,purchaser,row.proposal,true);
+    const base=await decisionFor(tx,purchaser,row.proposal,ctx,row.evidence.complete,
+      Boolean(row.evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+    const signals=stageFindings.flatMap(item=>(item.agentCommentary?.riskSignals??[]).map((signal:any)=>({
+      ...signal,agentId:item.agentId,stage:item.stage,
+    })));
+    const review:AgentReviewState={status:'COMPLETED',runId:run.id,reviewedVersion:row.version,evidenceHash:row.evidence.bundleHash,
+      sourceHash:hash({proposal:row.proposal,evidence:row.evidence}),signals};
+    const decision=applyAgentReview(base,review),version=row.version+1;
+    const status=decision.verdict==='REJECT'?'REJECTED':decision.reviewRequirements.some((r:any)=>r.resolution==='NEW_EVIDENCE')?'AWAITING_EVIDENCE':'AWAITING_CONSENT';
+    await tx.query('UPDATE requests SET decision=$3,status=$4,version=$5 WHERE org_id=$1 AND id=$2',[run.org_id,row.id,decision,status,version]);
+    await tx.query('INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [randomUUID(),run.org_id,row.id,version,row.proposal,hash(row.proposal),row.evidence,hash(row.evidence),decision,hash(decision)]);
+    const automatic=run.idempotency_key?.startsWith('auto:')&&this.options.devrevOrchestrationEnabled
+      ?await this.authorizeLowRisk(tx,purchaser,{...row,decision,version,status},decision):false;
+    await appendAudit(tx,run.org_id,null,'devrev.review_completed',row.id,{runId:run.id,version,riskScore:decision.riskScore,
+      riskSignals:review.signals.map(signal=>signal.code),automaticAuthorization:automatic,paymentExecution:false});
+    return {decision,workflowStatus:automatic?'AUTHORIZED':status,automatic,requiresHuman:decision.verdict!=='APPROVE'||decision.requiresHumanConsent||!decision.executionAllowed};
+  }
+
+  /** A failed/unsafe invocation stops auto-authorization and leaves a human-resolvable review requirement. */
+  async failDevRevReview(tx:Tx,run:any,errorCode:string,stageFindings:any[]) {
+    const row=(await tx.query('SELECT * FROM requests WHERE org_id=$1 AND id=$2 FOR UPDATE',[run.org_id,run.request_id])).rows[0];
+    if(!row||row.version!==run.snapshot.version||row.decision?.agentReview?.runId!==run.id)return;
+    const owner=(await tx.query('SELECT * FROM principals WHERE org_id=$1 AND id=$2 AND active',[run.org_id,row.created_by])).rows[0];
+    if(!owner||!['OPERATOR','AGENT'].includes(owner.role))return;
+    const purchaser:Principal={id:owner.id,orgId:run.org_id,credentialId:row.credential_id,role:owner.role,
+      approvalLimitMinor:owner.approval_limit_minor,capabilities:['request:read']};
+    const ctx=await context(tx,purchaser,row.proposal,true);
+    const base=await decisionFor(tx,purchaser,row.proposal,ctx,row.evidence.complete,
+      Boolean(row.evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+    const signals=stageFindings.flatMap(item=>(item.agentCommentary?.riskSignals??[]).map((signal:any)=>({...signal,agentId:item.agentId,stage:item.stage})));
+    const failed:AgentReviewState={...row.decision.agentReview,status:'FAILED',errorCode,signals};
+    const decision=applyAgentReview(base,failed),version=row.version+1;
+    const status=decision.verdict==='REJECT'?'REJECTED':decision.reviewRequirements.some((r:any)=>r.resolution==='NEW_EVIDENCE')?'AWAITING_EVIDENCE':'AWAITING_CONSENT';
+    await tx.query('UPDATE requests SET decision=$3,status=$4,version=$5 WHERE org_id=$1 AND id=$2',[run.org_id,row.id,decision,status,version]);
+    await tx.query('INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [randomUUID(),run.org_id,row.id,version,row.proposal,hash(row.proposal),row.evidence,hash(row.evidence),decision,hash(decision)]);
+    await appendAudit(tx,run.org_id,null,'devrev.review_failed',row.id,{runId:run.id,version,errorCode});
+  }
 
   async applyTrustResult(tx: Tx, orgId: string, row: any) {
     // Callback authority cannot impersonate an arbitrary user: recover the stored purchaser.
@@ -88,8 +177,9 @@ export class GateService {
     }
     const principal: Principal = {id:owner.id,orgId,credentialId:row.credential_id,role:owner.role,approvalLimitMinor:owner.approval_limit_minor};
     const ctx = await context(tx,principal,row.proposal,true);
-    const decision = await decisionFor(tx,principal,row.proposal,ctx,row.evidence.complete,
+    const base = await decisionFor(tx,principal,row.proposal,ctx,row.evidence.complete,
       Boolean(row.evidence.unresolvedRequirements?.some((r:string)=>r.startsWith("CONTRADICTORY_FACT"))),row.id);
+    const decision = this.withAgentReview(base,row);
     const version = row.version + 1;
     const status = decision.verdict === "REJECT" ? "REJECTED" : decision.reviewRequirements.some(r=>r.resolution==="NEW_EVIDENCE") ? "AWAITING_EVIDENCE" : "AWAITING_CONSENT";
     await tx.query("UPDATE requests SET decision=$3,status=$4,version=$5 WHERE org_id=$1 AND id=$2",[orgId,row.id,decision,status,version]);
@@ -100,10 +190,11 @@ export class GateService {
   }
 
   /** Agent lock serializes distinct submissions before duplicate checks and reservations. */
-  async authorizeLowRisk(tx: Tx, principal: Principal, row: any) {
+  async authorizeLowRisk(tx: Tx, principal: Principal, row: any, reviewedDecision?:ReturnType<typeof evaluate>&{agentReview?:AgentReviewState}) {
     const ctx = await context(tx, principal, row.proposal, true);
-    const decision = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete,
+    const base = reviewedDecision?undefined:await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete,
       Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+    const decision=reviewedDecision??this.withAgentReview(base!,row);
     if (decision.verdict !== "APPROVE" || decision.requiresHumanConsent || !decision.executionAllowed) return false;
     if ((await tx.query("SELECT 1 FROM payments WHERE org_id=$1 AND request_id=$2", [principal.orgId, row.id])).rowCount) return true;
     const payload = { proposal: row.proposal, evidenceHash: row.evidence.bundleHash, policyHash: hash(POLICY),
@@ -147,7 +238,8 @@ export class GateService {
   /** Reevaluation is advisory: it cannot reserve budget or create a payment. */
   async evaluateInvestigation(tx:Tx,principal:Principal,row:any,evidence:any) {
     const ctx=await context(tx,principal,row.proposal,true);
-    return decisionFor(tx,principal,row.proposal,ctx,evidence.complete,Boolean(evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+    const base=await decisionFor(tx,principal,row.proposal,ctx,evidence.complete,Boolean(evidence.unresolvedRequirements?.some((r:string)=>r.startsWith('CONTRADICTORY_FACT'))),row.id);
+    return this.withAgentReview(base,row,evidence);
   }
   async evaluationHistory(principal:Principal,id:string) {
     return transaction(this.db,principal.orgId,async tx=>{
@@ -179,14 +271,16 @@ export class GateService {
       const questions: string[] = row.evidence.investigation?.report?.unresolvedQuestions ?? [];
       const evidence = { ...fresh, complete: fresh.complete && questions.length === 0 };
       const ctx = await context(tx, principal, row.proposal);
-      const decision = await decisionFor(tx, principal, row.proposal, ctx, evidence.complete,
+      const base = await decisionFor(tx, principal, row.proposal, ctx, evidence.complete,
         fresh.unresolvedRequirements.some((r: string) => r.startsWith("CONTRADICTORY_FACT")), row.id);
+      const decision=this.withAgentReview(base,row,evidence);
       const evidenceContent = (value: any) => ({ items: value.items, links: value.links, missing: value.missing,
         unresolvedRequirements: value.unresolvedRequirements?.filter((r: string) => !r.startsWith("GATEKEEPER_QUESTION_")),
         coverage: value.coverage, referenceTime: value.referenceTime });
       const evidenceMatches = hash(evidenceContent(row.evidence)) === hash(evidenceContent(fresh));
       const findings = (value: any) => ({ verdict: value.verdict, riskScore: value.riskScore, factors: value.factors,
-        rules: value.rules, reviewRequirements: value.reviewRequirements, executionAllowed: value.executionAllowed });
+        rules: value.rules, reviewRequirements: value.reviewRequirements, executionAllowed: value.executionAllowed,
+        agentReview:value.agentReview });
       const decisionMatches = hash(findings(row.decision)) === hash(findings(decision));
       const policyMatches = row.decision.policyHash === decision.policyHash;
       const reasons = [
@@ -205,15 +299,23 @@ export class GateService {
 
   async create(principal: Principal, input: unknown, key: string, origin: "REQUEST" | "SIMULATED_PURCHASE" = "REQUEST") {
     roleAccess(principal, ["OPERATOR", "AGENT"]);
+    if(this.options.devrevOrchestrationEnabled)requireThat(this.automaticReviewStarter,
+      'ORCHESTRATION_COORDINATOR_UNAVAILABLE','Automatic DevRev review is not available.',503);
     const proposal = proposalSchema.parse(input);
     keySchema.parse(key);
-    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, origin === "REQUEST" ? proposal : {proposal,origin}, async () => {
+    const created=await transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, origin === "REQUEST" ? proposal : {proposal,origin}, async () => {
       const ctx = await context(tx, principal, proposal, true);
       requireThat(ctx.agent.owner_id === principal.id, "FORBIDDEN", "You may submit only for your assigned agent.", 403);
+      if(this.options.devrevOrchestrationEnabled) {
+        const read=(await tx.query("SELECT 'request:read'=ANY(gate_credential_capabilities($1)) AS allowed",[principal.credentialId])).rows[0]?.allowed;
+        requireThat(read,'DEVREV_REQUEST_READ_REQUIRED','Automatic DevRev review requires request:read on the submitting Gate credential.',403);
+      }
       const evidence = await collectEvidence(tx, principal, proposal);
       const initial = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
       const trustRequired = !!this.options.trustEnabled && initial.verdict !== "REJECT";
-      const decision = trustRequired ? await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), undefined, true) : initial;
+      const evaluated = trustRequired ? await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), undefined, true) : initial;
+      const pendingReview:AgentReviewState|undefined=this.options.devrevOrchestrationEnabled?{status:'PENDING',signals:[],evidenceHash:evidence.bundleHash,sourceHash:hash({proposal,evidence})}:undefined;
+      const decision = pendingReview?applyAgentReview(evaluated,pendingReview):evaluated;
       const status = decision.verdict === "REJECT" ? "REJECTED" : evidence.complete ? "AWAITING_CONSENT" : "AWAITING_EVIDENCE";
       const id = randomUUID();
       const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status,origin,trust_required)
@@ -227,6 +329,11 @@ export class GateService {
       if (await this.authorizeLowRisk(tx, principal, row)) row.status = "AUTHORIZED";
       return projection(row);
     }));
+    if(this.options.devrevOrchestrationEnabled&&['AWAITING_EVIDENCE','AWAITING_CONSENT','REJECTED'].includes(created.workflowStatus)) {
+      await this.automaticReviewStarter!(principal.orgId,created.id);
+      return this.get(principal,created.id);
+    }
+    return created;
   }
 
   /** Finance can decline a pending purchase before evidence/trust finishes; no authority is created. */
@@ -255,7 +362,9 @@ export class GateService {
       const row = await requestRow(tx, principal, id, true);
       requireThat(row.status === "AWAITING_CONSENT", "INVALID_STATE", "This request cannot be authorized.", 409);
       const ctx = await context(tx, principal, row.proposal);
-      const current = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+      const base = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+      const current=this.withAgentReview(base,row);
+      requireThat(current.agentReview?.status!=='PENDING','DEVREV_REVIEW_PENDING','Wait for the required DevRev agent reviews before creating a finance preview.',409);
       const version = row.version + 1;
       const expiresAt = new Date(Date.now() + POLICY.ttlSeconds * 1000).toISOString();
       const payload = { requestId: id, requestVersion: version, proposal: row.proposal, evidenceHash: row.evidence.bundleHash,
@@ -286,7 +395,9 @@ export class GateService {
         requireThat(BigInt(row.amount_minor) <= BigInt(principal.approvalLimitMinor), "APPROVAL_LIMIT", "Amount exceeds your approval authority.", 403);
         const currentEvidence = await collectEvidence(tx, principal, row.proposal);
         requireThat(evidenceSourceHash(currentEvidence) === evidenceSourceHash(row.evidence), "STALE_EVIDENCE", "Source evidence changed. Submit a new reviewed request.", 409);
-        const live = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+        const base = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+        const live=this.withAgentReview(base,row);
+        requireThat(live.agentReview?.status!=='PENDING','DEVREV_REVIEW_PENDING','Wait for the required DevRev agent reviews before making a finance decision.',409);
         requireThat(live.executionAllowed, "POLICY_BLOCKED", "Current policy or required evidence prevents execution.");
         requireThat(preview.payload.policyHash === hash(POLICY) && preview.payload.agentVersion === ctx.agent.version && preview.payload.merchantVersion === ctx.merchant.version && preview.payload.destinationRef === ctx.merchant.destination_ref,
           "STALE_PREVIEW", "Configuration changed. Review a new preview.", 409);

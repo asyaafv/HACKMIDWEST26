@@ -35,9 +35,11 @@ const ZodOrchestrationRecovery=z.object({acknowledgeReadOnlyReplay:z.literal(tru
 export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean; orchestration?:OrchestrationSettings; orchestrationPolling?:boolean } = {}) {
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
-  const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds});
+  const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds,
+    devrevOrchestrationEnabled:options.orchestration?.enabled});
   const investigations = new Investigations(db,service);
   const coordinator=options.orchestration?new OrchestrationCoordinator(db,service,options.orchestration):undefined;
+  if(coordinator&&options.orchestration?.enabled)service.setAutomaticReviewStarter((orgId,requestId)=>coordinator.startAutomaticForRequest(orgId,requestId));
   if(coordinator&&options.orchestrationPolling&&options.orchestration?.enabled) {
     let stopped=false,timer:ReturnType<typeof setTimeout>|undefined,inFlight:Promise<unknown>|undefined;
     const poll=()=>{inFlight=coordinator.runOnce().catch(()=>app.log.warn({code:'ORCHESTRATION_DEPENDENCY_UNAVAILABLE'},'Orchestration worker unavailable.'))
@@ -204,7 +206,10 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.post("/requests/:id/review", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req), false), req.id));
     api.get("/catalog", async req => wrap(await service.catalog(await principal(req)), req.id));
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));
-    api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
+    api.post("/requests", async (req, reply) => {
+      const result=await service.create(await principal(req),req.body,key(req));
+      reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id);
+    });
     api.post("/policy/preview", async req => wrap(await service.previewProposal(await principal(req), req.body), req.id));
     api.post("/requests/:id/trust-label", async req => wrap(await labelTrustHistory(db,await principal(req),id(req),req.body,key(req)),req.id));
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
