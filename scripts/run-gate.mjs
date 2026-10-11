@@ -45,7 +45,7 @@ export async function gateApiReady(base, origin) {
     const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500), ...(origin ? {headers:{Origin:origin}} : {}) });
     if (!health.ok) return false;
     const identity = await health.json();
-    if (identity.service !== 'gate-backend' || identity.dashboard !== true || identity.paymentExecution !== false) return false;
+    if (identity.service !== 'gate-backend' || identity.dashboard !== true || identity.demoDashboard !== true || identity.paymentExecution !== false) return false;
     const ready = await fetch(`${base}/health/ready`, { signal: AbortSignal.timeout(1500) });
     if (!ready.ok) return false;
     return true;
@@ -213,7 +213,13 @@ async function main() {
       existingApi = false; apiPort = await freePort(preferredApi);
     }
     const apiUrl = `http://127.0.0.1:${apiPort}`;
+    const scopeDb = new Pool({connectionString:baseEnv.DATABASE_URL,max:1});
+    let demoScope;
+    try { demoScope = (await scopeDb.query("SELECT p.org_id,p.id FROM principals p JOIN organizations o ON o.id=p.org_id WHERE o.name='Gate sandbox' AND p.role='FINANCE' AND p.active ORDER BY p.org_id,p.id LIMIT 1")).rows[0]; }
+    finally { await scopeDb.end(); }
+    if (!demoScope) throw new Error('No prepared demo workspace is available.');
     const serviceEnv = { ...baseEnv, PORT: String(apiPort), GATE_API_URL: apiUrl,
+      DEMO_WORKSPACE_ORG_ID: demoScope.org_id, DEMO_WORKSPACE_PRINCIPAL_ID: demoScope.id,
       ALLOWED_ORIGINS: [...new Set([apiUrl, frontendUrl, `http://localhost:${apiPort}`, `http://localhost:${frontendPort}`, ...String(baseEnv.ALLOWED_ORIGINS ?? '').split(',').filter(Boolean)])].join(','),
       BROWSER_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}`,
       MCP_ALLOWED_HOSTS: `127.0.0.1:${apiPort},localhost:${apiPort}` };
@@ -226,7 +232,7 @@ async function main() {
     }, 'frontend');
     await sleep(750);
     if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);
-    console.log(`\nGate is ready.\n  Gate dashboard: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Private demo tokens: ${resolve(work, 'demo-credentials.json')}\n  Service logs: ${work}\n\nThe dashboard reads PostgreSQL records and records enterprise reviews. No payment worker is started.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
+    console.log(`\nGate is ready.\n  Gate dashboard: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Dashboard: opens directly, no login\n  Service logs: ${work}\n\nThe dashboard reads PostgreSQL records and records enterprise reviews. No payment worker is started.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
     if (args.has('--smoke')) { console.log('[Gate] Startup smoke check passed. Stopping owned services.'); return; }
     while (!stopRequested) {
       if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);

@@ -24,7 +24,7 @@ test('an occupied port is preserved and the next port is selected', async () => 
 test('API reuse requires Gate identity and database readiness', async () => {
   let service = 'unrelated', consoleAvailable = false;
   const server = createServer((req, res) => {
-    if (req.url === '/health') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ service, dashboard:true, paymentExecution:false })); }
+    if (req.url === '/health') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ service, dashboard:true, demoDashboard:true, paymentExecution:false })); }
     else if (req.url === '/health/ready') res.end('{}');
     else { res.statusCode = consoleAvailable ? 200 : 404; res.end('Gate development console'); }
   });

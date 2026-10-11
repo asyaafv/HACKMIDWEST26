@@ -1,3 +1,21 @@
+# Current no-login dashboard contract
+
+`GET /v1/demo/dashboard` reads the explicitly configured shared demo workspace.
+Returns `data.identity`, catalog, latest 50 requests with linked historical payments,
+`transactionReview`, `snapshotHash`, and 100 related audit events. No browser login
+is required. Other REST and MCP routes remain authenticated.
+
+`POST /v1/demo/transactions/:id/review` requires the configured Host/Origin,
+Idempotency-Key and `{choice:"approve"|"reject", reason, expectedVersion, snapshotHash}`.
+Returns `{requestId, choice, paymentExecution:false}` inside the normal data envelope.
+Writes only a transaction review, idempotency response and chained audit event.
+409 STALE_TRANSACTION requires refresh; 409 ALREADY_REVIEWED prevents competing
+reviews; identical retries reuse the original result. A shared demo actor records
+decisions, not an authenticated individual. See integration-flow.md.
+
+The contracts below describe authenticated workflows and legacy simulator APIs;
+the main dashboard uses the transaction review contract above.
+
 # Gate v1 API contracts
 
 Version: 1.0.0 (additive). Base `/v1`. Success envelope `{data,meta:{traceId,mode:"sandbox",provider:"simulator"}}`; errors `{error:{code,message,details?},meta:{traceId}}`. Authentication routes return `{data}` without the financial envelope. Never treat eligibility, consent, authorization or payment as interchangeable.

@@ -20,7 +20,7 @@ export function TransactionTable({ records, selectedId, onSelect }: { records: T
 
 export function Transactions() {
   const { state } = useDemo(); const merchants = state!.merchants ?? []; const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<Decision | 'All'>('All'), [days, setDays] = useState(30), [create, setCreate] = useState(false);
+  const [filter, setFilter] = useState<Decision | 'All'>('All'), [days, setDays] = useState(0), [create, setCreate] = useState(false);
   const query = (params.get('search') ?? '').toLowerCase(); const tab = params.get('tab') === 'requests' ? 'Requests' : 'Transactions';
   const selectedId = params.get('request') ?? 'none';
   useEffect(() => { setFilter('All'); }, [query]);
@@ -28,14 +28,14 @@ export function Transactions() {
   const close = useCallback(() => choose('none'), [choose]);
   const records = useMemo(() => state!.transactions.filter(t => {
     const a = state!.agents.find(a => a.id === t.agentId)!, m = merchants.find(m => m.id === t.merchantId)!;
-    return Date.now() - Date.parse(t.createdAt) <= days * 86400000 && `${t.id} ${a.name} ${a.department} ${m.name} ${t.purpose}`.toLowerCase().includes(query);
+    return (days === 0 || Date.now() - Date.parse(t.createdAt) <= days * 86400000) && `${t.id} ${a.name} ${a.department} ${m.name} ${t.purpose}`.toLowerCase().includes(query);
   }), [state, days, query]);
   const visible = records.filter(t => filter === 'All' || t.decision === filter);
   const selected = state!.transactions.find(t => t.id === selectedId);
   const index = visible.findIndex(t => t.id === selectedId);
   return <div className={`transaction-workspace ${selected ? 'with-detail' : ''}`}><main className="queue-main"><PageTitle title="Authorization queue" description="Review spending requests, evidence, and policy checks." />
     <div className="queue-tabs" aria-label="Queue view">{['Transactions', 'Requests'].map(name => <button type="button" key={name} className={tab === name ? 'active' : ''} aria-pressed={tab === name} onClick={() => setParams(current => { const next = new URLSearchParams(current); if (name === 'Requests') next.set('tab', 'requests'); else next.delete('tab'); return next; })}>{name}</button>)}{tab === 'Requests' && state!.identity?.capabilities.includes('request:submit') && <button type="button" className="button primary new-request" disabled={!state!.identity?.capabilities.includes('request:submit')} onClick={() => setCreate(true)}><Plus size={17} />Create request</button>}</div>
-    <div className="queue-toolbar"><div className="status-filters">{(['All', 'Pending', 'Approved', 'Blocked'] as const).map(name => <button type="button" key={name} aria-pressed={filter === name} className={`filter-button ${filter === name ? 'active' : ''}`} onClick={() => setFilter(name)}>{name}<span className="count">{name === 'All' ? records.length : records.filter(t => t.decision === name).length}</span></button>)}</div><label className="date-filter"><CalendarBlank size={19} /><select aria-label="Date range" value={days} onChange={e => setDays(Number(e.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select><CaretDown size={16} /></label></div>
+    <div className="queue-toolbar"><div className="status-filters">{(['All', 'Pending', 'Approved', 'Blocked'] as const).map(name => <button type="button" key={name} aria-pressed={filter === name} className={`filter-button ${filter === name ? 'active' : ''}`} onClick={() => setFilter(name)}>{name}<span className="count">{name === 'All' ? records.length : records.filter(t => t.decision === name).length}</span></button>)}</div><label className="date-filter"><CalendarBlank size={19} /><select aria-label="Date range" value={days} onChange={e => setDays(Number(e.target.value))}><option value={0}>All loaded records</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select><CaretDown size={16} /></label></div>
     {query && <div className="search-summary">Results for “{params.get('search')}”<button type="button" className="text-link" onClick={() => setParams(current => { const next = new URLSearchParams(current); next.delete('search'); return next; })}>Clear search</button></div>}
     {visible.length ? <TransactionTable records={visible} selectedId={selectedId} onSelect={choose} /> : <Empty title="No matching transactions">Try another filter or date range, or clear your search.</Empty>}
     <p className="table-footer">{visible.length} {tab.toLowerCase()}, USD, Latest scoped backend records</p>
@@ -127,5 +127,5 @@ export function AuditLog() {
 /** Server identity is read-only; presentation preferences change only this connected view. */
 export function SettingsPage() {
   const { state } = useDemo();
-  return <main className="page-main settings-page"><PageTitle title="Settings" description="Your authenticated workspace."/><section className="settings-section"><div><h2>Identity</h2><p>Role and scope are provided by the backend.</p></div><div>{Object.entries(state!.identity ?? {}).map(([key,value])=><div className="readonly-setting" key={key}><span>{key}</span><strong>{Array.isArray(value)?value.join(', '):String(value)}</strong></div>)}</div></section><p>No financial execution or database reset controls are exposed.</p></main>;
+  return <main className="page-main settings-page"><PageTitle title="Settings" description="Your shared hackathon workspace."/><section className="settings-section"><div><h2>Identity</h2><p>Role and scope are provided by the backend.</p></div><div>{Object.entries(state!.identity ?? {}).map(([key,value])=><div className="readonly-setting" key={key}><span>{key}</span><strong>{Array.isArray(value)?value.join(', '):String(value)}</strong></div>)}</div></section><p>No financial execution or database reset controls are exposed.</p></main>;
 }

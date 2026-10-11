@@ -1,3 +1,19 @@
+# Current no-login transaction dashboard
+
+The main dashboard opens directly into an explicitly configured shared hackathon
+workspace and polls PostgreSQL every five seconds. Stored requests include linked
+historical payments. Independent transaction_reviews rows capture snapshot-bound
+approval/rejection and a reason; financial records and balances remain unchanged.
+The local database was inspected and has zero requests/payments. No transactions
+were seeded or fabricated. The additive review migration was applied locally.
+DevRev remains pending. This chat has not deployed changes to Render.
+
+Verified: 64 backend tests (including actual PostgreSQL/MCP/browser polling,
+lost-response review replay, existing-payment preservation, competing decisions,
+stale snapshots and scope/origin denial); backend typecheck; 30 frontend unit tests
+and frontend build; all 20 frontend browser checks (11 animation plus nine dashboard/entrance checks); four launcher checks. See integration-flow.md for the current
+contract. The old authenticated/console/payment acceptance below is historical.
+
 # Current main dashboard status
 
 The backend console and separate /live interface are removed. Main-dashboard

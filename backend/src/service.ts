@@ -11,6 +11,7 @@ import { evaluate, POLICY } from "./policy.js";
 import { hash } from "./hash.js";
 import { appendAudit } from "./audit.js";
 import { idempotent } from "./idempotency.js";
+import { transactionSnapshot } from "./transaction-review.js";
 import { GateWorker } from "./worker.js";
 
 export async function requestRow(tx: Tx, principal: Principal, id: string, lock = false) {
@@ -80,7 +81,8 @@ export class GateService {
           ["AWAITING_EVIDENCE","AWAITING_CONSENT","AUTHORIZED"].includes(row.status) && !payment?.dispatched_at ? ["CANCEL"] : []),
         ...(["FINANCE","ADMIN"].includes(principal.role) && can("finance:reconcile") && payment?.dispatched_at && payment.hold_state === "HELD" ? ["RECONCILE"] : []),
       ];
-      return { ...projection(row, payment, approval), permittedActions };
+      const transactionReview = (await tx.query('SELECT * FROM transaction_reviews WHERE org_id=$1 AND request_id=$2',[principal.orgId,id])).rows[0] ?? null;
+      return { ...projection(row, payment, approval), transactionReview, permittedActions };
     });
   }
 
@@ -283,15 +285,16 @@ export class GateService {
   async dashboard(principal: Principal) {
     const catalog = await this.catalog(principal);
     return transaction(this.db, principal.orgId, async tx => {
-      const rows = (await tx.query(`SELECT r.*,row_to_json(p) AS payment_row,row_to_json(a) AS approval_row
+      const rows = (await tx.query(`SELECT r.*,row_to_json(p) AS payment_row,row_to_json(a) AS approval_row,row_to_json(t) AS transaction_review
         FROM requests r LEFT JOIN payments p ON p.org_id=r.org_id AND p.request_id=r.id
         LEFT JOIN approvals a ON a.org_id=r.org_id AND a.request_id=r.id
+        LEFT JOIN transaction_reviews t ON t.org_id=r.org_id AND t.request_id=r.id
         WHERE r.org_id=$1 AND r.project_id IN (SELECT project_id FROM principal_projects WHERE org_id=$1 AND principal_id=$2)
         AND ($3<>'AGENT' OR r.agent_id IN (SELECT id FROM agents WHERE org_id=$1 AND owner_id=$2))
         ORDER BY r.created_at DESC,r.id DESC LIMIT 50`, [principal.orgId, principal.id, principal.role])).rows;
       const ids = rows.map(r => r.id);
       const events = (await tx.query(`SELECT * FROM audit_events WHERE org_id=$1 AND packet->>'resourceId'=ANY($2::text[]) ORDER BY sequence DESC LIMIT 100`, [principal.orgId, ids])).rows;
-      return { catalog, requests: rows.map(r => projection(r, r.payment_row, r.approval_row)), events,
+      return { catalog, requests: rows.map(r => ({ ...projection(r, r.payment_row, r.approval_row), transactionReview: r.transaction_review, snapshotHash: transactionSnapshot(r,r.payment_row) })), events,
         limits: { requests: 50, events: 100, exhaustive: false }, paymentExecution: false };
     });
   }

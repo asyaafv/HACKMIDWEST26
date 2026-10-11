@@ -1,82 +1,16 @@
 # Gate frontend
 
-An interactive, browser-persisted demo based on the approved authorization-queue reference. The backend is not required and no payment is executed.
+The React/TypeScript/Vite dashboard reads stored PostgreSQL transactions through
+the backend. Run `./run-gate.sh` at repository root for the complete local app.
+It opens without a login page and refreshes every five seconds. Approve/reject saves
+Gate review state and a reason without modifying existing payment records.
 
-## Run locally
+`npm run build`, `npm test` and `npm run test:browser` validate the frontend.
+Browser presentation tests mock API data explicitly; actual database/MCP/browser
+acceptance lives in backend/tests/live-frontend.test.ts. Production hosting needs
+same-origin /v1 routing to the backend; Vite supplies that proxy only locally.
 
-Use Node.js 22.12+ (developed with Node 24) and npm.
-
-```sh
-npm ci
-npm run dev
-```
-
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The default route opens Transactions with GitHub selected. Vite supports direct navigation to each application route.
-
-```sh
-npm run build
-npm run preview
-npm test
-npm run test:browser
-```
-
-Browser tests use a locally installed Google Chrome through Playwright; no browser download is necessary. They exercise saved workflows and capture the four approved viewport widths in `.impeccable/review/`.
-
-## Verification
-
-The production build and TypeScript checks pass, along with seven data-service tests and seven browser tests. Visual captures cover 1672×941, 1440×941, 1024×941, and 390×844, with additional full-page captures for Overview, Policies, Audit log, and Settings. Browser checks cover persistence, policy evaluations, decisions, audit entries, confirmed reset, corrupt storage recovery, and keyboard/focus behavior across the detail-panel breakpoint.
-
-The independent Impeccable review returned `ship` for its three corrected findings: invisible vendor artwork spacing, removal of the redundant policy-editor label, and responsive detail-panel focus/scroll handling. The missing merchant assets remain the documented visual dependency below.
-
-## Demo behavior
-
-- Starts with 24 requests: 18 approved, 3 pending, 3 blocked, plus ten Gatekeepers with different original character portraits.
-- Name, description, portrait, and optional department can be saved for a Gatekeeper. Portrait reuse is allowed. Pausing disables new requests without deleting history.
-- Create requests from Overview or the Requests tab. Amounts are stored as integer USD cents. Saved local policies return Approved, Pending, or Blocked; pending requests accept one human review decision with a reason.
-- Policy edits apply to future requests only. Existing requests retain their evaluation snapshot and evidence.
-- Counts, Overview metrics, request history, and Audit log share one state. Settings update the visible profile/workspace and feedback preferences.
-- Data persists under `gate.demo.v1` in this browser. Settings includes a confirmed reset. Failed saves do not update state; malformed saved data is retained until explicit reset.
-
-## Backend connection later
-
-`src/types.ts` defines `DemoDataService`. `src/service.ts` implements its asynchronous operations with local storage; `src/context.tsx` owns loading, saving, and error feedback. Replace the service implementation when APIs are available, keeping the page components and domain types. There are no fabricated endpoints or backend changes in this build.
-
-When hosting the production build, configure SPA fallback to `index.html` for the application routes.
-
-## Original artwork and pending logos
-
-`ASSETS.json` records the source of every supplied image. Character PNGs and the rainbow logo retain the original bytes; circles are CSS crops. The rainbow logo is used only in the top-left navigation branding.
-
-Merchant logo files are awaiting user delivery: GitHub, Delta, GiftCards.com, Google Ads, AWS, Deel, Notion, Stripe, FedEx, Linear. No merchant artwork is drawn, substituted, or downloaded. Their layout space remains reserved without displaying replacement graphics. Once provided, store the files under `public/assets/merchants/` and set each merchant's `logo` path in `src/data.ts`.
-
-The supplied screenshot remains the visual authority. The exact merchant artwork is the remaining dependency for completing those placements. Self-hosted Inter and Phosphor pictograms approximate the reference's type and interface glyphs.
-
-## Connected workspace
-
-Open `/live` for the real backend workflow; the designed demo remains separate.
-Run `./run-gate.sh` from the repository root for coordinated API/frontend ports.
-The local API proxy uses `GATE_API_URL` (default http://127.0.0.1:8000).
-See [integration flow](../backend/docs/integration-flow.md) for independent operator/finance testing and production HTTPS requirements.
-
-## Character animation
-
-Every Gatekeeper uses the shared curved-eyelid rig, slow glances, blinking and subtle eye-pair sway. An initial motion style (float, drift, gentle turn, or breathe) is assigned from the agent ID; subsequent turns rotate actions through the shared scheduler. Ground and body currently move as a portrait; rotation is limited to 1.2 degrees. The character with glasses keeps its frames and bridge fixed while its pupils blink.
-
-Open `/animation-preview` (or “Try the animated character” on Gatekeepers) and choose any of the ten characters. The preview provides look left/right, blink, wink, eyes closed, pointer-following gaze, and pause/resume at 440px and 112px. Transactions and Overview show 72px animated agent portraits. Gatekeeper cards use 160px portraits on desktop and 128px on mobile.
-
-Original PNGs remain intact. Generated clean plates repair only the feathered eye regions; provenance and exact prompts are stored beside each plate. Motion pauses offscreen, in hidden tabs and for paused Gatekeepers. Reduced motion allows direct expressions with no ambient spatial motion. Suspension preserves the timeline and current pose.
-
-Validation: `npm run build`, `npm run test`, and `npm run test:browser -- tests/browser/animation.spec.ts`.
-
-Ambient animation runs independently for each visible agent, with staggered first turns within one second and 3–4 seconds of rest between actions. Duplicate rows share an identity cooldown. Actions rotate through float, drift, tilt, breathe, nod, lean, glance, blink, wink and a relaxed both-eyes-closed pose. The relaxed pose closes over 140 ms, holds for one second, and reopens over 260 ms. Offscreen, paused and reduced-motion portraits stay still; preview controls remain available.
-
-Gaze now moves each white eye ring, its eyelid aperture and its pupil together, with up to 75 source-image units of horizontal travel including the delayed sway. The glasses character retains fixed frames and moves its pupils inside them.
-
-## Current dashboard connection
-
-The main dashboard now uses the PostgreSQL-backed REST adapter. The separate /live
-workspace is removed. Run ./run-gate.sh at the repo root, connect your private local
-identity in the main frontend, and inspect actual scoped requests/evidence/policies.
-Finance records enterprise-only reviews, with no payment or budget mutation.
-Legacy browser fixture workflows are historical; backend/tests/live-frontend.test.ts
-is the actual database-backed main-dashboard browser acceptance suite.
+Agent configuration and published policies are read-only. No backend failure uses
+browser-local fixtures as fallback. Existing character art and entrance animation
+remain presentation assets. See ../backend/docs/integration-flow.md for scope,
+review persistence, shared demo identity and deployment configuration.

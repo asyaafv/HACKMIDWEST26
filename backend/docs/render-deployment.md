@@ -1,3 +1,17 @@
+# Current dashboard deployment addition
+
+Configure DEMO_WORKSPACE_ORG_ID and DEMO_WORKSPACE_PRINCIPAL_ID to one intended
+hackathon organization and an active FINANCE principal with its project grants.
+Apply migration 040_transaction_reviews.sql through db:migrate. The dashboard
+opens without credentials through /v1/demo/dashboard and records independent
+reviews through /v1/demo/transactions/:id/review. Anyone visiting the demo shares
+that workspace's reviewer. Route frontend /v1 to the API under the same origin and
+configure exact ALLOWED_ORIGINS/BROWSER_ALLOWED_HOSTS. No worker is needed.
+The remote deployment has not been changed from this chat.
+
+The following is historical starter-replacement/legacy payment reference; its
+worker and login sections are not required by the current dashboard.
+
 # Render deployment handoff
 
 ## Observed public service, October 10, 2026
