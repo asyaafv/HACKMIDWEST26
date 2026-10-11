@@ -10,6 +10,7 @@ import { pendingRequests } from './decisions';
 import { investigationLabels } from './InvestigationPanel';
 import { TransactionPanel } from './TransactionPanel';
 import type { Decision, Transaction } from './types';
+import { BackendService } from './backend-service';
 
 export function TransactionTable({ records, selectedId, onSelect }: { records: Transaction[]; selectedId?: string; onSelect: (id: string) => void }) {
   const { state } = useDemo(); const merchants = state!.merchants ?? [];
@@ -127,6 +128,13 @@ export function AuditLog() {
 
 /** Server identity is read-only; presentation preferences change only this connected view. */
 export function SettingsPage() {
-  const { state } = useDemo();
-  return <main className="page-main settings-page"><PageTitle title="Settings"/><section className="settings-section"><div><h2>Identity</h2></div><div>{Object.entries(state!.identity ?? {}).map(([key,value])=><div className="readonly-setting" key={key}><span>{key}</span><strong>{Array.isArray(value)?value.join(', '):String(value)}</strong></div>)}</div></section></main>;
+  const { state,run,busy } = useDemo();
+  const [username,setUsername]=useState(''),[password,setPassword]=useState('');
+  return <main className="page-main settings-page"><PageTitle title="Settings"/><section className="settings-section"><div><h2>Identity</h2></div><div>{Object.entries(state!.identity ?? {}).map(([key,value])=><div className="readonly-setting" key={key}><span>{key}</span><strong>{Array.isArray(value)?value.join(', '):String(value)}</strong></div>)}
+  {state?.identity?.authenticated?<button type="button" className="button" disabled={busy} onClick={()=>{void run(service=>(service as BackendService).signOut(),'Signed out.');}}>Sign out</button>:<form onSubmit={e=>{e.preventDefault();const submitted=password;setPassword('');void run(service=>(service as BackendService).signIn(username,submitted),'Signed in.');}}>
+   <p className="demo-note">Sign in with an existing Gate account to run an authenticated DevRev review. The shared demo identity cannot start orchestration.</p>
+   <label className="field">Username<input autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required maxLength={200}/></label>
+   <label className="field">Password<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={256}/></label>
+   <div className="form-footer"><button className="button primary" disabled={busy||!username||!password}>Sign in</button></div>
+  </form>}</div></section></main>;
 }

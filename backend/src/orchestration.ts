@@ -84,6 +84,26 @@ export class OrchestrationCoordinator {
    return {run,stages,events,financialApproval:false};
   });
  }
+ async list(p:Principal,requestId:string) {
+  this.access(p);
+  return transaction(this.db,p.orgId,async tx=>{
+   await requestRow(tx,p,requestId);
+   return {items:(await tx.query('SELECT id,status,created_at FROM orchestration_runs WHERE org_id=$1 AND request_id=$2 ORDER BY created_at DESC,id DESC LIMIT 10',[p.orgId,requestId])).rows};
+  });
+ }
+ async availability(p:Principal) {
+  capabilityAccess(p,'request:read');
+  const blockers:string[]=[];
+  if(!this.settings.enabled)blockers.push('ORCHESTRATION_DISABLED');
+  if(!this.settings.gateOrgId)blockers.push('WORKSPACE_NOT_CONFIGURED');
+  else if(p.orgId!==this.settings.gateOrgId)blockers.push('WORKSPACE_NOT_AUTHORIZED');
+  if(!this.settings.apiToken)blockers.push('DEVREV_API_NOT_CONFIGURED');
+  if(!this.settings.webhookId||!this.settings.webhookSecret)blockers.push('DEDICATED_WEBHOOK_NOT_CONFIGURED');
+  if(this.settings.versions.some(v=>!v))blockers.push('READ_ONLY_VERSIONS_NOT_CONFIGURED');
+  const tables=(await this.db.query("SELECT to_regclass('public.orchestration_runs') IS NOT NULL AND to_regclass('public.orchestration_stages') IS NOT NULL AND to_regclass('public.orchestration_events') IS NOT NULL AS ready")).rows[0];
+  if(!tables?.ready)blockers.push('ORCHESTRATION_SCHEMA_MISSING');
+  return {ready:blockers.length===0,blockers,financialApproval:false};
+ }
  async recover(p:Principal,id:string,key:string) {
   const {run}=await this.get(p,id);
   return this.start(p,run.request_id,key,id);

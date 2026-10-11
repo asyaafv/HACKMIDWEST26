@@ -1,5 +1,5 @@
 /** Isolated PostgreSQL/MCP/browser acceptance verifies anonymous demo reviews without financial mutations. */
-import { beforeAll, afterAll, it, expect } from 'vitest';
+import { beforeAll,beforeEach, afterAll, it, expect } from 'vitest';
 import { chromium, type Browser, expect as browserExpect } from '@playwright/test';
 import EmbeddedPostgres from 'embedded-postgres';
 import { randomUUID } from 'node:crypto';
@@ -14,7 +14,8 @@ import { prepareDemo, seedControls } from '../scripts/seed.js';
 import { createApp } from '../src/app.js';
 import { authenticate } from '../src/auth.js';
 import { GateService } from '../src/service.js';
-import { provisionGatekeeper } from '../src/identity.js';
+import { Investigations } from '../src/investigations.js';
+import { provisionGatekeeper,provisionHumanLogin } from '../src/identity.js';
 import { callGateTool } from '../scripts/gatekeeper-scenario.js';
 const pg = new EmbeddedPostgres({ databaseDir: `work/live-test-${randomUUID()}`, user: 'live_test', password: 'isolated_only', port: 60000 + process.pid % 500, persistent: false, postgresFlags: ['-h','127.0.0.1'], onLog: () => {}, onError: () => {} });
 let admin: DB, runtime: DB, browser: Browser, app: ReturnType<typeof createApp>, vite: ChildProcess;
@@ -38,7 +39,36 @@ beforeAll(async () => {
   }
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE });
 });
+beforeEach(async()=>{
+ // Each scenario gets its own real rate limiter; preceding tests must not consume its IP quota.
+ await app.close();const host=new URL(base).host;
+ app=createApp(runtime,{demoWorkspace:{orgId:controls.orgId,principalId:controls.identities.FINANCE!.id},origins:[frontend],browserHosts:[host],mcpHosts:[host]});
+ await app.listen({host:'127.0.0.1',port:Number(new URL(base).port)});
+});
 afterAll(async () => { await browser?.close(); if (vite && vite.exitCode === null) { const stopped = new Promise(resolve => vite.once('exit', resolve)); vite.kill('SIGTERM'); await stopped; } await app?.close(); await runtime?.end(); await admin?.end(); await pg.stop(); });
+it('signs in through the existing settings UI and uses the real scoped dashboard with an HttpOnly session',async()=>{
+ await provisionHumanLogin(admin,controls.orgId,controls.identities.OPERATOR!.id,'ui-operator','isolated-ui-password');
+ const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(`${frontend}/settings`);
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
+ await page.getByLabel('Username',{exact:true}).fill('ui-operator');await page.getByLabel('Password',{exact:true}).fill('isolated-ui-password');
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();await browserExpect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();
+ const cookies=await page.context().cookies();expect(cookies.find(c=>c.name==='__Host-gate_session')).toMatchObject({httpOnly:true,secure:true,sameSite:'Strict'});
+ const identity=await page.evaluate(async()=> (await (await fetch('/v1/auth/me')).json()).data);expect(identity.role).toBe('OPERATOR');
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();await browserExpect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible();await page.close();
+});
+it('authenticated transaction annotations enforce finance access and preserve financial records',async()=>{
+ const service=new GateService(runtime),operator=await authenticate(runtime,`Bearer ${controls.identities.OPERATOR!.token}`),finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`);
+ const request=await service.create(operator,{agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Authenticated annotation test',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}},randomUUID());
+ await new Investigations(runtime,service).localRun(finance,request.id,{expectedVersion:request.version},randomUUID());
+ const record=(await service.dashboard(finance)).requests.find(r=>r.id===request.id)!,body={choice:'reject',reason:'Independent annotation',expectedVersion:record.version,snapshotHash:record.snapshotHash};
+ const counts=async()=>Promise.all(['payments','jobs','simulator_transactions','budget_entries','approvals','authorizations'].map(async table=>(await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count));const before=await counts();
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/transaction/review`,headers:{authorization:`Bearer ${controls.identities.OPERATOR!.token}`,'idempotency-key':randomUUID()},payload:body})).statusCode).toBe(403);
+ const headers={authorization:`Bearer ${controls.identities.FINANCE!.token}`,'idempotency-key':randomUUID()};
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/transaction/review`,headers,payload:body})).statusCode).toBe(200);
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/transaction/review`,headers,payload:body})).statusCode).toBe(200);
+ expect(await counts()).toEqual(before);expect((await service.get(finance,request.id)).version).toBe(record.version);
+ expect((await admin.query('SELECT packet->\'details\'->>\'actorMode\' AS mode FROM audit_events WHERE packet->>\'resourceId\'=$1 AND packet->>\'event\'=\'transaction.rejected\'',[request.id])).rows[0].mode).toBe('authenticated_human');
+});
 it('opens without login, polls actual MCP records, and replays a lost review response once', async () => {
  const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(frontend);
  if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
@@ -117,7 +147,7 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await browserExpect(page.getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
  await browserExpect(page.getByText('Simulated purchase proposal · imported synthetic context. Payments use the local sandbox provider.',{exact:true})).toBeVisible();
  await browserExpect(page.getByText('Waiting for Gatekeeper',{exact:true}).first()).toBeVisible();
- await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toHaveCount(0);
+ await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toBeDisabled();
  await page.route('**/v1/demo/transactions/*/investigation',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/investigation');});
  await page.getByRole('button',{name:'Run local investigation',exact:true}).click();
  await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
@@ -140,10 +170,11 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,projectId:randomUUID()}})).statusCode).toBe(404);
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,amountMinor:'1.5'}})).statusCode).toBe(400);
  await page.goto(`${frontend}/gatekeepers`);
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
  await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
  await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
  await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
- await page.getByLabel('Amount (USD)',{exact:true}).fill('742.35');
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('1742.35'); // Duplicate detection requires the same exact amount.
  await page.getByLabel('Spend category',{exact:true}).selectOption('incident_response');
  await page.getByLabel('Business purpose',{exact:true}).fill('Simulated agent purchase from Gatekeepers');
  await page.getByLabel('Find supporting evidence').fill('GATE-ISSUE-101');

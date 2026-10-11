@@ -1,5 +1,5 @@
 /** Maps stored transactions and their independent Gate reviews into the main dashboard. */
-import { LiveApi, type Proposal } from './live-api';
+import { LiveApi, ApiError, type Proposal } from './live-api';
 import { merchants as artwork } from './data';
 import type { AuditEvent, DemoDataService, DemoState, GatekeeperInput, PolicyKind, RequestInput, Settings, Transaction, Merchant, Evidence, Investigation, RiskAssessment } from './types';
 export const api = new LiveApi();
@@ -19,8 +19,18 @@ export class BackendService implements DemoDataService {
   private investigationActions=new Map<string,{expectedVersion:number;action:string}>();
   private created: { signature: string; action: string; id?: string } | null = null;
   private settings: Settings | null = null;
+  private authenticated=false;
+  async signIn(username:string,password:string) {
+    const session=await api.call<{csrfToken:string}>('/auth/login',{username,password});
+    api.clear();api.setCsrf(session.csrfToken);return this.load();
+  }
+  async signOut() { await api.call('/auth/logout',{});api.clear();this.authenticated=false;return this.load(); }
   async load(): Promise<DemoState> {
-    const dashboard = await api.call<{ identity: {id:string;orgId:string;role:string;capabilities:string[]}; catalog: Catalog; requests: RecordRow[]; events: { sequence: string; packet: { resourceId: string; event: string; actorId: string; details: unknown; createdAt: string } }[] }>('/demo/dashboard');
+    let identity:DemoState['identity'];
+    try{identity=await api.call('/auth/me');this.authenticated=true;}
+    catch(error){if(!(error instanceof ApiError&&error.status===401))throw error;if(this.authenticated)api.clear();this.authenticated=false;api.setCsrf('');}
+    const dashboard = await api.call<{ identity: {id:string;orgId:string;role:string;capabilities:string[]}; catalog: Catalog; requests: RecordRow[]; events: { sequence: string; packet: { resourceId: string; event: string; actorId: string; details: unknown; createdAt: string } }[] }>(this.authenticated?'/dashboard':'/demo/dashboard');
+    if(identity)dashboard.identity=identity;
     const me = dashboard.identity;
     const c = dashboard.catalog;
     const merchants: Merchant[] = c.merchants.map(m => ({ id: m.id, name: m.name, category: m.status, domain: '', logo: artwork.find(a => a.name.toLowerCase() === m.name.toLowerCase())?.logo }));
@@ -31,7 +41,7 @@ export class BackendService implements DemoDataService {
       return ({
       simulated: r.origin === 'SIMULATED_PURCHASE', id: r.id, agentId: r.proposal.agentId, merchantId: r.proposal.merchantId, amount: Number(r.proposal.amountMinor), priority: 'P2',
       decision: r.decision.verdict === 'REJECT' || r.workflowStatus === 'REJECTED' ? 'Blocked' : review?.choice === 'reject' ? 'Blocked' : r.decision.verdict === 'APPROVE' || ['AUTHORIZED','EXECUTING','COMPLETED','RECONCILING'].includes(r.workflowStatus) || review?.choice === 'approve' ? 'Approved' : 'Pending',
-      reason: review?.reason, investigation:r.payment?null:r.investigation,canApprove:!!r.payment||(r.workflowStatus==='AWAITING_CONSENT'&&r.evidence.complete!==false&&r.decision.verdict!=='REJECT'),approvalBlockReason:r.workflowStatus==='AWAITING_EVIDENCE'?'Approval is waiting for required evidence or the trust assessment. Resolve the outstanding checks below; you can deny this request now.':undefined,unresolvedQuestions:r.evidence.unresolvedRequirements??r.evidence.investigation?.report.unresolvedQuestions,previousReview:!review&&r.transactionReview?r.transactionReview:undefined, reviewBinding: {version:r.version,snapshotHash:r.snapshotHash},
+      reason: review?.reason, investigation:r.payment?null:r.investigation,canApprove:!!r.payment||(r.workflowStatus==='AWAITING_CONSENT'&&r.evidence.complete!==false&&r.decision.verdict!=='REJECT'&&(!r.investigation||r.investigation.status==='EVALUATED')),approvalBlockReason:r.investigation&&r.investigation.status!=='EVALUATED'&&!r.payment?'Complete the required investigation before recording a human review.':r.workflowStatus==='AWAITING_EVIDENCE'?'Approval is waiting for required evidence or the trust assessment. Resolve the outstanding checks below; you can deny this request now.':undefined,unresolvedQuestions:r.evidence.unresolvedRequirements??r.evidence.investigation?.report.unresolvedQuestions,previousReview:!review&&r.transactionReview?r.transactionReview:undefined, reviewBinding: {version:r.version,snapshotHash:r.snapshotHash},
       risk: r.decision.riskScore, riskAssessment:r.decision.riskAssessment,createdAt: r.createdAt, purpose: r.proposal.purpose, project: c.projects.find(p => p.id === r.proposal.projectId)?.name ?? r.proposal.projectId,
       category: r.proposal.category, source: r.proposal.source, reviewRequirements: r.decision.reviewRequirements,
       paymentMethod: r.payment ? 'Existing PostgreSQL payment' : 'Stored transaction request', workflowStatus: r.workflowStatus, policyVerdict: r.decision.verdict, authorizationStatus: r.authorizationStatus !== 'NONE' ? r.authorizationStatus : review ? 'REVIEWED' : r.workflowStatus === 'AWAITING_CONSENT' ? 'AWAITING_REVIEW' : 'NONE',
@@ -43,7 +53,7 @@ export class BackendService implements DemoDataService {
     for (const t of transactions) if (!agents.some(a => a.id === t.agentId)) agents.push({ id: t.agentId, name: t.agentId, description: 'Historical agent; not present in the current scoped catalog.', department: 'Historical', avatar: 1, active: false, createdAt: '', projectId: '', ownerId: '',canPurchase:false });
     const events: AuditEvent[] = dashboard.events.map(e => ({ id: e.sequence, type: /review|consent|transaction\.(approved|rejected)/.test(e.packet.event) ? 'decision' : 'request', title: e.packet.event.replaceAll('.',' '), detail: JSON.stringify(e.packet.details), createdAt: e.packet.createdAt, actor: e.packet.actorId ?? 'Backend', transactionId: e.packet.resourceId }));
     const settings = this.settings ?? { name: me.role, initials: me.role.slice(0,2), workspace: 'Gate workspace', notifications: true, compact: false };
-    return { version: 1, agents, merchants, transactions, policies: [], events, settings, identity: me, catalog: c, bounded: true };
+    return { version: 1, agents, merchants, transactions, policies: [], events, settings, identity: {...me,authenticated:this.authenticated}, catalog: c, bounded: true };
   }
   async createRequest(input: RequestInput) {
     if (!input.source || !input.project) throw new Error('Select an authorized project and source.');
@@ -51,7 +61,7 @@ export class BackendService implements DemoDataService {
     const signature = JSON.stringify(body);
     if (this.created && this.created.signature !== signature) throw new Error('Recover the previous submission or start a new request form before changing an uncertain action.');
     this.created ??= { signature, action: crypto.randomUUID() };
-    const result = await api.call<{ id: string }>('/demo/purchases', body, this.created.action); this.created.id = result.id;
+    const result = await api.call<{ id: string }>(this.authenticated?'/requests':'/demo/purchases', body, this.created.action); this.created.id = result.id;
     const state = await this.load(); state.transactions.sort((a,b) => a.id === result.id ? -1 : b.id === result.id ? 1 : 0); return state;
   }
   newRequest() { this.created = null; }
@@ -65,7 +75,7 @@ export class BackendService implements DemoDataService {
   }
   async reviewTransaction(transaction: Transaction, choice: 'approve'|'reject', reason: string, action: string) {
     if (!transaction.reviewBinding) throw new Error('Refresh this transaction before reviewing it.');
-    await api.call(`/demo/transactions/${transaction.id}/review`, {choice,reason,expectedVersion:transaction.reviewBinding.version,snapshotHash:transaction.reviewBinding.snapshotHash},action);
+    await api.call(this.authenticated?`/requests/${transaction.id}/transaction/review`:`/demo/transactions/${transaction.id}/review`, {choice,reason,expectedVersion:transaction.reviewBinding.version,snapshotHash:transaction.reviewBinding.snapshotHash},action);
     return this.load();
   }
   async createGatekeeper(_input: GatekeeperInput): Promise<DemoState> { throw new Error('Gatekeepers are provisioned through the backend identity tools.'); }

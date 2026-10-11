@@ -3,7 +3,7 @@ import { beforeAll,beforeEach,afterAll,it,expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import EmbeddedPostgres from 'embedded-postgres';
 import { Pool,transaction } from '../src/db.js';
-import { migrate } from '../scripts/migrate.js';
+import { migrate,inspectMigrations } from '../scripts/migrate.js';
 import { seedControls } from '../scripts/seed.js';
 import { GateService } from '../src/service.js';
 import { OrchestrationCoordinator } from '../src/orchestration.js';
@@ -34,7 +34,11 @@ const coordinator=()=>new OrchestrationCoordinator(db,service,settings,transport
 beforeAll(async()=>{
  await pg.initialise();await pg.start();await pg.createDatabase('orchestration_tests');
  const connectionString=`postgresql://orchestration_test:isolated_test_only@127.0.0.1:${port}/orchestration_tests`;
- admin=new Pool({connectionString});await migrate(admin);const controls=await seedControls(admin);
+ admin=new Pool({connectionString});
+ expect((await inspectMigrations(admin)).pending).toContain('090_devrev_orchestration.sql');
+ expect((await admin.query("SELECT to_regclass('public.gate_migrations') AS ledger")).rows[0].ledger).toBeNull();
+ await migrate(admin);expect(await inspectMigrations(admin)).toMatchObject({pending:[],changed:[]});
+ const controls=await seedControls(admin);
  token=controls.identities.OPERATOR!.token;
  const credential=(await admin.query('SELECT id FROM credentials WHERE principal_id=$1',[controls.identities.OPERATOR!.id])).rows[0].id;
  p={id:controls.identities.OPERATOR!.id,orgId:controls.orgId,credentialId:credential,role:'OPERATOR',approvalLimitMinor:'0',capabilities:['request:read']};
@@ -180,6 +184,23 @@ it('exposes only GateGetRequest on the orchestration MCP endpoint and preserves 
 it('requires three correctly associated version pins before enabling orchestration',()=>{
  expect(()=>configuration({DATABASE_URL:'postgresql://fixture/fixture',DEVREV_ORCHESTRATION_ENABLED:'true'})).toThrow();
  expect(configuration({DATABASE_URL:'postgresql://fixture/fixture'}).DEVREV_ORCHESTRATION_ENABLED).toBe(false);
+});
+it('serves scoped UI run discovery, authenticated readiness and read-only request validation without exposing secrets',async()=>{
+ const id=await start(),app=createApp(db,{orchestration:settings});
+ try{
+  expect((await app.inject({method:'GET',url:'/v1/orchestrations/status'})).statusCode).toBe(401);
+  const headers={authorization:`Bearer ${token}`};
+  const status=await app.inject({method:'GET',url:'/v1/orchestrations/status',headers});
+  expect(status.json().data).toEqual({ready:true,blockers:[],financialApproval:false});
+  expect(status.headers['cache-control']).toBe('private, no-store');expect(status.body).not.toContain(settings.apiToken);
+  const list=await app.inject({method:'GET',url:`/v1/requests/${requestId}/orchestrations`,headers});
+  expect(list.json().data.items[0].id).toBe(id);
+  expect((await app.inject({method:'GET',url:`/v1/requests/${randomUUID()}/orchestrations`,headers})).statusCode).toBe(404);
+  expect((await app.inject({method:'GET',url:`/v1/requests/${requestId}/validation`,headers})).statusCode).toBe(200);
+  expect((await app.inject({method:'GET',url:`/v1/requests/${requestId}/history`,headers})).statusCode).toBe(200);
+ }finally{await app.close();}
+ const disabled=new OrchestrationCoordinator(db,service,{...settings,enabled:false,webhookSecret:'',versions:['','','']});
+ expect((await disabled.availability(p)).blockers).toEqual(['ORCHESTRATION_DISABLED','DEDICATED_WEBHOOK_NOT_CONFIGURED','READ_ONLY_VERSIONS_NOT_CONFIGURED']);
 });
 it('persists HTTP rejection and session mismatch without dispatching a following stage',async()=>{
  for(const kind of ['rejected','wrong-session']) {

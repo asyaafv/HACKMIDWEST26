@@ -54,6 +54,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     });
   }
   app.register(rateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: req => req.ip });
+  app.addHook('onSend',async(req,reply,payload)=>{if(req.url.startsWith('/v1/'))reply.header('Cache-Control','private, no-store');return payload;});
   const origins = options.origins ?? [];
   app.addHook("onRequest", async (req, reply) => {
     if (req.headers.origin) {
@@ -157,6 +158,8 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     const id = (req: any) => idSchema.parse(req.params.id);
     const wrap = (data: unknown, traceId: string) => ({ data, meta: { traceId, mode: "sandbox", provider: "simulator" } });
     if(coordinator) {
+      api.get('/orchestrations/status',async req=>wrap(await coordinator.availability(await principal(req)),req.id));
+      api.get('/requests/:id/orchestrations',async req=>wrap(await coordinator.list(await principal(req),id(req)),req.id));
       api.post('/orchestrations',async(req,reply)=>{
         const body=ZodOrchestrationStart.parse(req.body);
         const data=await coordinator.start(await principal(req),body.requestId,key(req));reply.code(202);return wrap(data,req.id);
@@ -193,6 +196,10 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       requireThat(result, "NOT_FOUND", "Context not found.", 404); return wrap(result, req.id);
     });
     api.get("/dashboard", async req => wrap(await service.dashboard(await principal(req)), req.id));
+    api.post('/requests/:id/transaction/review',async req=>{
+      const p=await principal(req);roleAccess(p,['FINANCE']);
+      return wrap(await reviewTransaction(db,p,id(req),req.body,key(req),'authenticated_human'),req.id);
+    });
     api.post("/requests/:id/review", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req), false), req.id));
     api.get("/catalog", async req => wrap(await service.catalog(await principal(req)), req.id));
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));

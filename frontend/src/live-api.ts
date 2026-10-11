@@ -1,30 +1,36 @@
-/** REST client for the live workspace; credentials and retry bindings stay in memory. */
+/** Cookie-authenticated REST client; only CSRF and nonsecret retry keys use session storage. */
 export class LiveApi {
-  token = '';
-  csrf = '';
+  csrf = typeof sessionStorage === 'undefined' ? '' : sessionStorage.getItem('gate.csrf') ?? '';
   private actions = new Map<string, { signature: string; key: string }>();
-  clear() { this.token = ''; this.csrf = ''; this.actions.clear(); }
+  setCsrf(value:string) { this.csrf=value; if(typeof sessionStorage!=='undefined')sessionStorage.setItem('gate.csrf',value); }
+  clear() { this.csrf = ''; this.actions.clear(); if(typeof sessionStorage!=='undefined')sessionStorage.removeItem('gate.csrf'); }
   async call<T>(path: string, body?: unknown, action?: string): Promise<T> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (this.token) headers.Authorization = `Bearer ${this.token}`;
-    if (body !== undefined && this.csrf && !this.token) headers['X-CSRF-Token'] = this.csrf;
+    if (body !== undefined && this.csrf) headers['X-CSRF-Token'] = this.csrf;
     if (action) {
       // A lost response must replay the same purchase, never generate a replacement.
       const signature = JSON.stringify([path, body]);
-      const saved = this.actions.get(action);
+      const storageKey=action.startsWith('orchestration:')?`gate.${action}`:null;
+      const persisted=storageKey&&typeof sessionStorage!=='undefined'?sessionStorage.getItem(storageKey):null;
+      const saved = this.actions.get(action)??(persisted?JSON.parse(persisted):undefined);
       if (saved && saved.signature !== signature) throw new Error('Uncertain action: retry its original values before changing them.');
-      if (!saved) this.actions.set(action, { signature, key: crypto.randomUUID() });
+      this.actions.set(action,saved??{signature,key:crypto.randomUUID()});
+      if(storageKey&&typeof sessionStorage!=='undefined')sessionStorage.setItem(storageKey,JSON.stringify(this.actions.get(action)));
       headers['Idempotency-Key'] = this.actions.get(action)!.key;
     }
     let response: Response;
     try {
       response = await fetch(`/v1${path}`, { method: body === undefined ? 'GET' : 'POST', headers,
-        credentials: 'same-origin', cache: 'no-store', body: body === undefined ? undefined : JSON.stringify(body) });
+        credentials: 'same-origin', cache: 'no-store', redirect:'error', signal:AbortSignal.timeout(15000), body: body === undefined ? undefined : JSON.stringify(body) });
     } catch { throw new Error(action ? 'Response lost. Retry the identical action; its key is retained.' : 'Backend unavailable.'); }
-    const result = await response.json();
-    if (!response.ok) throw new Error(`${result.error?.code ?? response.status}: ${result.error?.message ?? 'Request failed'}, trace ${result.meta?.traceId ?? 'unavailable'}`);
+    let result;
+    try {result=await response.json();}catch{throw new Error('Backend returned an invalid response. Check the /v1 proxy and backend deployment.');}
+    if (!response.ok) throw new ApiError(response.status,result.error?.code??String(response.status),`${result.error?.message ?? 'Request failed'}, trace ${result.meta?.traceId ?? 'unavailable'}`);
     return result.data as T;
   }
+}
+export class ApiError extends Error {
+  constructor(public status:number,public code:string,message:string){super(`${code}: ${message}`);}
 }
 /** Parse decimal dollars using integer arithmetic; reject rounding and exponent formats. */
 export function minorUnits(value: string) {

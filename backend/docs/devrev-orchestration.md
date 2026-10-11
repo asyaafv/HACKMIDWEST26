@@ -42,6 +42,11 @@ For REVIEW, REJECT, missing evidence, human-consent requirements or backend risk
 
 ## Configuration
 
+**Final hackathon release decision:** keep the original agents unchanged and
+`DEVREV_ORCHESTRATION_ENABLED=false`. Do not perform the agent republishing or
+webhook setup below for this demo. Follow [the final release checklist](hack-midwest-final-demo.md).
+The configuration below remains a reference for a future reviewed restricted execution path.
+
 Server environment variables (see `.env.example`):
 
 | Variable | Value |
@@ -76,7 +81,7 @@ The integration tests create and stop their own local PostgreSQL cluster under i
 
 These steps are provided for review; they have **not** been performed.
 
-1. Review source changes and migration 090. Apply `npm run db:migrate` using the existing administrative migration process, without reset/seed/import. Deploy using existing Render `backend` build `npm ci && npm run build` and start `npm start`, retaining `DEVREV_ORCHESTRATION_ENABLED=false`. Use an always-running API instance for reliable deadlines; paused/sleeping instances resume persisted work after wake-up.
+1. Migration 090 is already applied in production with the repository checksum; the final frontend/backend release changes no migration SQL. The read-only production ledger check found all 12 deployed migrations applied, with no pending files or checksum conflicts. Do not run `npm run db:migrate` manually for this release. Deploy using the existing Render `backend` build `npm ci && npm run build` and configured start command `node dist/scripts/migrate.js && npm start`, retaining `DEVREV_ORCHESTRATION_ENABLED=false`. The start command runs the migration runner, which should find no SQL to apply.
 2. Privately configure the dedicated callback secret and Gate tenant binding. The disabled server can answer authenticated DevRev verification challenges. Obtain approval before creating a new secret or credential. Do not rotate the existing PAT or Gate credential.
 3. Register a separate DevRev webhook via `POST https://api.devrev.ai/internal/webhooks.create`, using the existing private PAT. The exact JSON body is `{url:"https://hackmidwest26.onrender.com/v1/integrations/devrev/orchestration/webhook",event_types:["ai_agent_response"],headers:[{name:"x-api-key",value:"<private dedicated secret>"}]}`. Supply `Authorization: Bearer <private PAT>` privately. Capture only the returned webhook ID/status, never print its headers or full registration response. Set `DEVREV_ORCHESTRATION_WEBHOOK_ID` and wait for `active` in `internal/webhooks.get`. The handler requires `x-api-key` even for `verify.challenge` and returns `{challenge: ...}`. The production trust webhook remains unchanged.
 4. In DevRev, configure a dedicated Gate MCP connection at `https://hackmidwest26.onrender.com/mcp/orchestration`, using the existing scoped Gate/DevRev identity mechanism verified in Phase 1. Verify the catalog contains only `GateGetRequest`. Publish reviewed versions of agents 4, 7 and 8 with that sole skill and their specialized role instructions. Remove access to other skills/connections from these versions. Verify the API-invoking PAT owner can use the connection.
