@@ -1,21 +1,21 @@
 export type Decision = 'Approved' | 'Pending' | 'Blocked';
 export type Priority = 'P0' | 'P1' | 'P2';
 export type PolicyKind = 'vendors' | 'budget' | 'limit' | 'purpose' | 'categories' | 'risk';
-export interface Gatekeeper { id: string; name: string; description: string; department: string; avatar: number; active: boolean; createdAt: string }
+export interface Gatekeeper { id: string; name: string; description: string; department: string; avatar: number; active: boolean; createdAt: string; projectId?: string; ownerId?: string }
 export interface Merchant { id: string; name: string; category: string; domain: string; logo?: string }
 export interface Policy { id: PolicyKind; name: string; description: string; enabled: boolean; value: number | string; version: number }
 export interface PolicyCheck { id: PolicyKind; name: string; detail: string; passed: boolean; version: number }
-export interface Evidence { id: string; title: string; subtitle: string; kind: 'vendor' | 'request' | 'project' | 'budget' | 'purpose'; text: string }
+export interface Evidence { id: string; title: string; subtitle: string; kind: 'vendor' | 'request' | 'project' | 'budget' | 'purpose'; text: string; sourceId?: string; domain?: string; sourceHash?: string }
 export interface Transaction {
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
-  paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
+  workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; backend?: unknown; historicalPayment?: unknown; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
 }
 export interface AuditEvent { id: string; type: 'request' | 'decision' | 'gatekeeper' | 'policy' | 'settings'; title: string; detail: string; createdAt: string; actor: string; transactionId?: string; agentId?: string }
 export interface Settings { name: string; initials: string; workspace: string; notifications: boolean; compact: boolean }
-export interface DemoState { version: 1; agents: Gatekeeper[]; transactions: Transaction[]; policies: Policy[]; events: AuditEvent[]; settings: Settings }
+export interface DemoState { version: 1; agents: Gatekeeper[]; transactions: Transaction[]; policies: Policy[]; events: AuditEvent[]; settings: Settings; merchants?: Merchant[]; identity?: { id: string; role: string; orgId: string; capabilities: string[] }; catalog?: { projects: {id:string;name:string}[]; budgets: {project_id:string;limit_minor:string;spent_minor:string;reserved_minor:string}[]; policy: unknown }; bounded?: boolean }
 export interface GatekeeperInput { name: string; description: string; department: string; avatar: number }
-export interface RequestInput { agentId: string; merchantId: string; amount: number; priority: Priority; purpose: string; project: string }
+export interface RequestInput { agentId: string; merchantId: string; amount: number; priority: Priority; purpose: string; project: string; source?: { domain: 'pm'|'crm'|'document'; sourceId: string }; category?: 'diagnostics'|'incident_response' }
 export interface DemoDataService {
   load(): Promise<DemoState>;
   createGatekeeper(input: GatekeeperInput): Promise<DemoState>;

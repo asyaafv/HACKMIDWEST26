@@ -1,3 +1,11 @@
+# Current main dashboard status
+
+The backend console and separate /live interface are removed. Main-dashboard
+REST integration and no-payment enterprise review are verified by actual isolated
+MCP/PostgreSQL/browser tests. Approval creates zero payments/jobs/budget entries
+and preserves budget balances. Historical simulator acceptance below remains
+reference material. See [current integration flow](integration-flow.md).
+
 # Gate integration status
 
 Verified October 10, 2026: original console acceptance plus connected /live workspace. Current full backend suite: 74 tests passed; frontend suite: 10 tests passed; frontend build and backend typecheck passed. See [integration-flow.md](integration-flow.md) for the new workflow and [test-report.md](test-report.md) for the earlier console acceptance outputs and source/seed fingerprints.
@@ -13,3 +21,18 @@ Verified October 10, 2026: original console acceptance plus connected /live work
 - Hosted environment/external payment: UNVERIFIED. No public deployment or external provider configured; same-origin HTTPS human-session acceptance remains a release gate.
 
 A configuration flag or a recently seen worker process does not prove remote integration, this tenant's payment completion or another human's consent. The protected /v1/integrations response follows the same boundary. No public debug auth/fault controls are enabled by default.
+
+Public Render check October 10, 2026: hackmidwest26.onrender.com exposes the historical unauthenticated Python three-tool MCP contract; current REST health and /live routes return 404. See [Render deployment handoff](render-deployment.md). This is not the current backend deployment or proof of DevRev integration.
+
+Current acceptance: frontend build and backend typecheck pass; backend regression
+suite 64 tests passed; frontend unit suite 24 tests passed; main frontend browser
+suite 13 tests passed; launcher checks 4 tests passed. Actual private-database
+browser acceptance covers MCP-to-main-dashboard review with zero payment/job/budget
+side effects and retained-key lost-response recovery. Updated launcher smoke was
+not run to completion because an existing user-owned launcher is active; it was
+preserved and must be restarted by its owning terminal.
+
+PR integration against current GitHub main preserves the Gate entrance animation.
+Merged validation: frontend build/backend typecheck, 64 backend tests, 30 frontend
+unit tests and 20 browser tests passed. Browser checks use a private frontend port
+and explicitly authenticate after the entrance; no other checkout is reused.

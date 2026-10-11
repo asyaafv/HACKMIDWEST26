@@ -16,7 +16,7 @@ export const merchants: Merchant[] = [
 ];
 export const departments = ['procurement', 'travel', 'marketing', 'infrastructure', 'hr', 'finance', 'operations', 'engineering'];
 export const avatarUrl = (number: number) => `/assets/characters/character_${String(number).padStart(2, '0')}.png`;
-export const money = (minor: number, decimals = false) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: decimals ? 2 : 0, minimumFractionDigits: decimals ? 2 : 0 }).format(minor / 100);
+export const money = (minor: number, decimals = false) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2, minimumFractionDigits: decimals || minor % 100 !== 0 ? 2 : 0 }).format(minor / 100);
 export function ago(date: string): string {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
   if (minutes < 1) return 'Just now';

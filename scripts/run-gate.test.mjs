@@ -21,10 +21,10 @@ test('an occupied port is preserved and the next port is selected', async () => 
   } finally { server.close(); await once(server, 'close'); }
 });
 
-test('API reuse requires Gate identity, DB readiness and the real console', async () => {
+test('API reuse requires Gate identity and database readiness', async () => {
   let service = 'unrelated', consoleAvailable = false;
   const server = createServer((req, res) => {
-    if (req.url === '/health') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ service })); }
+    if (req.url === '/health') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ service, dashboard:true, paymentExecution:false })); }
     else if (req.url === '/health/ready') res.end('{}');
     else { res.statusCode = consoleAvailable ? 200 : 404; res.end('Gate development console'); }
   });
@@ -32,7 +32,7 @@ test('API reuse requires Gate identity, DB readiness and the real console', asyn
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     assert.equal(await gateApiReady(base), false);
-    service = 'gate-backend'; assert.equal(await gateApiReady(base), false);
+    service = 'gate-backend'; assert.equal(await gateApiReady(base), true);
     consoleAvailable = true; assert.equal(await gateApiReady(base), true);
   } finally { server.closeAllConnections(); server.close(); await once(server, 'close'); }
 });

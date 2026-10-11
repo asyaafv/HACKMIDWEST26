@@ -2,6 +2,34 @@
 
 Local stateless Streamable HTTP SDK calls use real scoped Gate identities and sandbox outcomes. Actual DevRev connector discovery/calls, installed custom skill, and second-human reuse remain **UNVERIFIED**. Platform menu labels, authentication support and setup routes have not been observed; confirm them with the authorized team administrator before recording exact instructions. Localhost is reachable only by local SDK callers.
 
+## Team deployment address
+
+The team supplied `https://hackmidwest26.onrender.com` as the intended public
+base URL. The candidate Gate endpoint is `https://hackmidwest26.onrender.com/mcp`.
+Public discovery on October 10, 2026 returned the historical Python three-tool
+contract, not the current authenticated Gate backend. See
+[Render deployment handoff](../docs/render-deployment.md) for observed responses
+and the required service change. DevRev registration remains unverified.
+
+For the API deployment, configure `HOST=0.0.0.0`, `APP_MODE=sandbox`,
+`DEV_CONSOLE=false`, `MCP_ALLOWED_HOSTS=hackmidwest26.onrender.com`, and
+`BROWSER_ALLOWED_HOSTS=hackmidwest26.onrender.com`. Let Render supply `PORT`.
+Set `ALLOWED_ORIGINS` to the exact actual frontend origin; use
+`https://hackmidwest26.onrender.com` only if the UI is served there. Store the real
+DATABASE_URL privately in the hosting service. Run the worker against that same
+persistent database. Never expose the local bearer-token test console publicly.
+
+Before registering DevRev, verify `/health`, `/health/ready`, and unauthenticated
+`/mcp` denial from an external client, then authenticated MCP SDK discovery using
+an independently provisioned remote AGENT credential. A reset or timeout from a
+single testing environment does not establish that the deployed service is down.
+Gate currently provides bearer-authenticated MCP; confirm the team's DevRev
+connection supports this before choosing authentication fields.
+
+The API does not serve the built React app by itself. A public `/live` page requires
+a frontend deployment and same-origin API routing, or a separately configured
+frontend origin. The Vite proxy described in integration-flow.md is local only.
+
 ## Public deployment prerequisites
 
 1. Deploy persistent API, worker, and private PostgreSQL. Apply migrations using the admin/migration identity, including 030; run API and worker with the restricted runtime identity. Do not migrate or reset the shared development DB as a connector test.

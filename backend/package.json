@@ -20,7 +20,7 @@
     "audit:verify": "node --env-file-if-exists=.env --import tsx scripts/verify-audit.ts",
     "demo:prepare": "node --env-file-if-exists=.env --import tsx scripts/seed.ts --prepare",
     "contracts:export": "node --import tsx scripts/export-contracts.ts",
-    "test:e2e": "vitest run tests/console.e2e.test.ts",
+    "test:e2e": "vitest run tests/live-frontend.test.ts",
     "gatekeeper:provision": "node --env-file-if-exists=.env --import tsx scripts/provision-gatekeeper.ts",
     "gatekeeper:scenario": "node --env-file-if-exists=.env --import tsx scripts/gatekeeper-scenario.ts",
     "gatekeeper:manifest": "node --import tsx scripts/gatekeeper-manifest.ts",
