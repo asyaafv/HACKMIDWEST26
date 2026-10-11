@@ -67,6 +67,30 @@ function projection(row: any, payment?: any, approval?: any) {
 export class GateService {
   constructor(public db: DB) {}
 
+  /** Agent lock serializes distinct submissions before duplicate checks and reservations. */
+  async authorizeLowRisk(tx: Tx, principal: Principal, row: any) {
+    const ctx = await context(tx, principal, row.proposal, true);
+    const decision = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete,
+      Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
+    if (decision.verdict !== "APPROVE" || decision.requiresHumanConsent || !decision.executionAllowed) return false;
+    if ((await tx.query("SELECT 1 FROM payments WHERE org_id=$1 AND request_id=$2", [principal.orgId, row.id])).rowCount) return true;
+    const payload = { proposal: row.proposal, evidenceHash: row.evidence.bundleHash, policyHash: hash(POLICY),
+      agentVersion: ctx.agent.version, merchantVersion: ctx.merchant.version, destinationRef: ctx.merchant.destination_ref };
+    const paymentId = randomUUID();
+    await tx.query(`INSERT INTO payments(id,org_id,request_id,budget_id,amount_minor,bound_hash,status,hold_state,expires_at,operation_key,policy_snapshot)
+      VALUES($1,$2,$3,$4,$5,$6,'QUEUED','HELD',now()+interval '5 minutes',$1::uuid::text,$7)`,
+      [paymentId, principal.orgId, row.id, ctx.budget.id, row.amount_minor, hash(payload), payload]);
+    await tx.query(`INSERT INTO authorizations(id,org_id,request_id,payment_id,budget_id,bound_hash,state,expires_at)
+      SELECT $1,$2,$3,$4,$5,$6,'READY',expires_at FROM payments WHERE org_id=$2 AND id=$4`,
+      [randomUUID(), principal.orgId, row.id, paymentId, ctx.budget.id, hash(payload)]);
+    await tx.query("UPDATE budgets SET reserved_minor=reserved_minor+$3 WHERE org_id=$1 AND id=$2", [principal.orgId, ctx.budget.id, row.amount_minor]);
+    await tx.query("INSERT INTO budget_entries VALUES($1,$2,$3,$4,'RESERVE',$5,now())", [randomUUID(), principal.orgId, paymentId, ctx.budget.id, row.amount_minor]);
+    await tx.query("INSERT INTO jobs(id,org_id,payment_id) VALUES($1,$2,$3)", [randomUUID(), principal.orgId, paymentId]);
+    await tx.query("UPDATE requests SET status='AUTHORIZED' WHERE org_id=$1 AND id=$2", [principal.orgId, row.id]);
+    await appendAudit(tx, principal.orgId, null, "policy.authorized", row.id, { paymentId, decision, authority: "DETERMINISTIC_POLICY" });
+    return true;
+  }
+
   async get(principal: Principal, id: string) {
     return transaction(this.db, principal.orgId, async tx => {
       const row = await requestRow(tx, principal, id);
@@ -119,7 +143,7 @@ export class GateService {
     const proposal = proposalSchema.parse(input);
     keySchema.parse(key);
     return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, "request.create", key, origin === "REQUEST" ? proposal : {proposal,origin}, async () => {
-      const ctx = await context(tx, principal, proposal);
+      const ctx = await context(tx, principal, proposal, true);
       requireThat(ctx.agent.owner_id === principal.id, "FORBIDDEN", "You may submit only for your assigned agent.", 403);
       const evidence = await collectEvidence(tx, principal, proposal);
       const decision = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
@@ -132,6 +156,7 @@ export class GateService {
         VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9)`, [randomUUID(), principal.orgId, id, proposal, hash(proposal), evidence, hash(evidence), decision, hash(decision)]);
       await tx.query("INSERT INTO investigations(org_id,request_id,status) VALUES($1,$2,'WAITING')",[principal.orgId,id]);
       await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, origin, evidenceHash: evidence.bundleHash, decision });
+      if (await this.authorizeLowRisk(tx, principal, row)) row.status = "AUTHORIZED";
       return projection(row);
     }));
   }

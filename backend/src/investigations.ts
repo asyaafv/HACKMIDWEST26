@@ -79,7 +79,8 @@ export class Investigations {
    await tx.query('INSERT INTO investigation_reports(id,org_id,request_id,run_id,actor_id,mode,request_version,report) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),p.orgId,id,inv.run_id,p.id,inv.mode,version,body.report]);
    const result=(await tx.query("UPDATE investigations SET status='EVALUATED',version=version+1,evaluated_at=now(),lease_until=NULL WHERE org_id=$1 AND request_id=$2 RETURNING *",[p.orgId,id])).rows[0];
    await appendAudit(tx,p.orgId,p.id,'investigation.evaluated',id,{runId:inv.run_id,requestVersion:version,verdict:decision.verdict,riskScore:decision.riskScore,evidenceHash:evidence.bundleHash});
-   return {investigation:result,requestVersion:version,decision,paymentExecution:false};
+   const automatic = await this.service.authorizeLowRisk(tx,p,{...row,evidence,decision,version});
+   return {investigation:result,requestVersion:version,decision,paymentExecution:automatic};
   }));
  }
  async fail(p:Principal,id:string,input:unknown,key:string,local=false) {

@@ -22,7 +22,7 @@ const port=59000+process.pid%500;
 const pg=new EmbeddedPostgres({databaseDir:`work/investigations-${randomUUID()}`,user:'investigation_test',password:'isolated_only',port,persistent:false,postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
 let admin:DB,runtime:DB,service:GateService,flow:Investigations,controls:Awaited<ReturnType<typeof seedControls>>,buyer:Principal,finance:Principal,keeper:Principal,otherKeeper:Principal;
 let app:ReturnType<typeof createApp>,client:Client;
-const proposal=()=>({agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'74235',currency:'USD',category:'diagnostics',purpose:'Investigation test proposal',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}});
+const proposal=()=>({agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'174235',currency:'USD',category:'diagnostics',purpose:'Investigation test proposal',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}});
 async function create(){return service.create(buyer,proposal(),randomUUID());}
 async function reportFor(id:string){const row=await service.get(finance,id);const bundle=await transaction(runtime,finance.orgId,tx=>collectEvidence(tx,finance,row.proposal));return {sources:bundle.items.map(s=>({domain:s.domain,sourceId:s.sourceId,sourceHash:s.sourceHash,contentHash:s.contentHash})),links:bundle.links,unresolvedQuestions:[] as string[]};}
 async function review(id:string,choice:'approve'|'reject') {const row=(await service.dashboard(finance)).requests.find(r=>r.id===id)!;return reviewTransaction(runtime,finance,id,{choice,reason:'Reviewed current enterprise evidence',expectedVersion:row.version,snapshotHash:row.snapshotHash},randomUUID());}
