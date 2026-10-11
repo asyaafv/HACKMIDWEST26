@@ -12,11 +12,9 @@ export async function callGateTool(client:Client,name:string,args:Record<string,
  requireThat(envelope,'INVALID_TOOL_OUTPUT','Structured Gate result required.');return envelope.data;
 }
 export async function runGatekeeperScenario(client:Client,options:{proposal:Proposal;permissionToRecord:boolean;idempotencyKey:string;requestId?:string}) {
- const required=options.requestId ? ['gate_capabilities','gate_get_request','gate_explain_request'] : ['gate_capabilities','gate_catalog','gate_get_context','gate_preview_spend','gate_request_spend','gate_get_request','gate_list_requests','gate_explain_request'];
+ const required=options.requestId ? ['gate_get_request'] : ['gate_catalog','gate_get_context','gate_preview_spend','gate_request_spend','gate_get_request','gate_list_requests'];
  const discovered=(await client.listTools()).tools.map(t=>t.name);
  requireThat(required.every(t=>discovered.includes(t)),'MISSING_TOOLS','Required Gate tools unavailable.');
- const capabilities=await callGateTool(client,'gate_capabilities',{}) as {usableTools:string[]};
- requireThat(required.every(t=>capabilities.usableTools.includes(t)),'FORBIDDEN','Connection lacks scenario capabilities.');
  if(options.requestId) return recoverGatekeeperOutcome(client,options.requestId);
  const proposal=proposalSchema.parse(options.proposal);
  const catalog=await callGateTool(client,'gate_catalog',{});
@@ -34,7 +32,7 @@ export async function runGatekeeperScenario(client:Client,options:{proposal:Prop
  return {catalog,context,preview,recorded,...await recoverGatekeeperOutcome(client,id)};
 }
 export async function recoverGatekeeperOutcome(client:Client,requestId:string) {
- return {request:await callGateTool(client,'gate_get_request',{request_id:requestId}),explanation:await callGateTool(client,'gate_explain_request',{request_id:requestId})};
+ return {request:await callGateTool(client,'gate_get_request',{request_id:requestId})};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
  const client=new Client({name:'Gatekeeper local scenario',version:'0.2.0'});
