@@ -107,7 +107,7 @@ describe("Gate sandbox workflow", () => {
     await admin.query("UPDATE budgets SET limit_minor=200000");
     const requests = await Promise.all([service.create(operator, proposal, randomUUID()), service.create(operator, proposal, randomUUID())]);
     const previews = await Promise.all(requests.map(r => service.preview(finance, r.id, randomUUID())));
-    const results = await Promise.allSettled(requests.map((r, i) => service.consent(finance, r.id, { choice: "approve", previewId: previews[i]!.id, previewHash: previews[i]!.previewHash, expectedVersion: previews[i]!.expectedVersion, reason: "Unit test", reviewResolutions: ["AMOUNT_REQUIRES_REVIEW"] }, randomUUID())));
+    const results = await Promise.allSettled(requests.map((r, i) => service.consent(finance, r.id, { choice: "approve", previewId: previews[i]!.id, previewHash: previews[i]!.previewHash, expectedVersion: previews[i]!.expectedVersion, reason: "Unit test", reviewResolutions: previews[i]!.decision.reviewRequirements.filter(r => r.resolution === "HUMAN_JUDGMENT").map(r => r.code) }, randomUUID())));
     expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
     expect((await admin.query("SELECT reserved_minor FROM budgets")).rows[0].reserved_minor).toBe("170000");
   });

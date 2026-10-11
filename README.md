@@ -32,8 +32,9 @@ historical payment details. A separate `transaction_reviews` row records approva
 or rejection, its reason and the reviewed snapshot; the original request status,
 payment status and budget balances are preserved. No payment worker is started.
 An empty database produces an empty dashboard. To create a labeled demo proposal,
-open Gatekeepers → Simulate purchase. It runs the real policy/evidence engine using
-imported sources; live DevRev investigation remains pending.
+open Gatekeepers → Simulate purchase. It records an initial policy check and waits for investigation. Open its detail and
+choose Run local investigation to test imported evidence, then review the resulting
+policy decision. Live DevRev setup remains pending.
 
 Press Ctrl+C to stop services owned by the launcher. Existing history is preserved.
 Logs are in backend/work. `./run-gate.sh --smoke` verifies startup and then stops

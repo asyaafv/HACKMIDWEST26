@@ -78,3 +78,13 @@ shown in transaction details, including the fact that DevRev investigation is
 pending. The form opens the saved transaction after submission. Retained keys
 make lost-response retries create one proposal. No payment/job/budget reservation
 is created, and the simulation does not claim a live AI investigation.
+
+## Investigation lifecycle update
+
+New proposals now wait for a Gatekeeper investigation. Initial policy findings remain
+visible as an initial check, separate from the completed investigation result. The
+transaction detail shows persisted milestones, failure/gap information and bounded
+evaluation history. Run local investigation tests the handoff with imported evidence;
+it does not invoke or claim a live DevRev agent. New source reports are validated,
+reevaluated and archived as new versions; earlier human reviews remain historical.
+See gatekeeper-investigations.md for the complete 0.4.0 MCP and REST contract.

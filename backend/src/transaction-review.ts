@@ -33,10 +33,13 @@ export async function reviewTransaction(db: DB, principal: Principal, requestId:
     // Lock the request before its payment, so competing reviewers cannot both commit.
     const row = (await tx.query('SELECT * FROM requests WHERE org_id=$1 AND id=$2 FOR UPDATE', [principal.orgId,requestId])).rows[0];
     requireThat(row, 'NOT_FOUND', 'Transaction not found.', 404); await projectAccess(tx,principal,row.project_id);
+    const investigation=(await tx.query('SELECT status FROM investigations WHERE org_id=$1 AND request_id=$2',[principal.orgId,requestId])).rows[0];
     const payment = (await tx.query('SELECT * FROM payments WHERE org_id=$1 AND request_id=$2 FOR SHARE', [principal.orgId,requestId])).rows[0];
+    requireThat(!investigation||payment||investigation.status==='EVALUATED','INVESTIGATION_PENDING','Complete the Gatekeeper investigation before recording a review.',409);
+    if(investigation&&!payment&&body.choice==='approve')requireThat(row.evidence.complete&&row.decision.verdict!=='REJECT','POLICY_BLOCKED','Missing evidence or a hard policy denial prevents approval.',422);
     requireThat(row.version === body.expectedVersion && transactionSnapshot(row,payment) === body.snapshotHash,
       'STALE_TRANSACTION', 'This transaction changed. Refresh and review its current details.', 409);
-    requireThat(!(await tx.query('SELECT 1 FROM transaction_reviews WHERE org_id=$1 AND request_id=$2', [principal.orgId,requestId])).rowCount,
+    requireThat(!(await tx.query('SELECT 1 FROM transaction_reviews WHERE org_id=$1 AND request_id=$2 AND request_version=$3', [principal.orgId,requestId,row.version])).rowCount,
       'ALREADY_REVIEWED', 'This transaction already has a recorded review.', 409);
     await tx.query('INSERT INTO transaction_reviews(org_id,request_id,actor_id,choice,reason,snapshot_hash,request_version) VALUES($1,$2,$3,$4,$5,$6,$7)',
       [principal.orgId,requestId,principal.id,body.choice,body.reason,body.snapshotHash,body.expectedVersion]);

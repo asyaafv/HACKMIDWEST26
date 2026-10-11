@@ -17,3 +17,17 @@ This repository draft is not the actual team DevRev skill, is not reviewed again
 8. Use `gate_get_request` to explain source evidence, policy decision, and review. Only describe a receipt if an actual historical payment exists. Label the synthetic dataset and gaps honestly.
 
 Never include credentials, override hard denies, describe risk points as fraud probability, or add external business evidence.
+
+## Investigation handoff addition — draft only
+
+Use a dedicated investigator:true Gate credential with investigation:write. Discover
+version 0.4.0 before mutation. Call gate_list_investigations, select a granted-project
+proposal, then gate_start_investigation with its current request version and a stable
+key. Preserve the returned run_id/lease. Retrieve exact context; submit its actual
+source/content hashes and verified edges through gate_submit_evidence, with runId,
+expectedVersion, unresolvedQuestions and a stable submission key. Do not invent a
+verdict, confidence, citation or relationship. New external sources require trusted
+server ingestion before submission. If retrieval fails, call gate_fail_investigation
+with a reason. After expiry claim a new run; never reuse an expired fencing token.
+Recover the resulting policy/evidence/version/review through gate_get_request.
+Human review belongs to the independent dashboard, not to the Gatekeeper.

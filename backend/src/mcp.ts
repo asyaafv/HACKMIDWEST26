@@ -1,4 +1,5 @@
 /** Stateless Gate MCP transport delegates to REST's services; chat never supplies finance identity. */
+import { Investigations } from "./investigations.js";
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -12,6 +13,7 @@ import { listRequests, sourceContext } from "./mcp-context.js";
 import { GateError, requireThat } from "./errors.js";
 
 export function attachMcp(app: FastifyInstance, db: DB, service: GateService, allowedHosts: string[], allowedOrigins: string[] = []) {
+  const investigations = new Investigations(db,service);
   app.route({ method: ["GET", "POST", "DELETE"], url: "/mcp", handler: async (req, reply) => {
     requireThat(allowedHosts.includes(req.headers.host ?? ""), "HOST_FORBIDDEN", "MCP host not allowed.", 403);
     if (req.headers.origin) requireThat(allowedOrigins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "MCP origin not allowed.", 403);
@@ -32,6 +34,11 @@ export function attachMcp(app: FastifyInstance, db: DB, service: GateService, al
         return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code, message: error instanceof GateError ? error.message : "Tool could not complete." } }) }] };
       }
     };
+
+    server.registerTool('gate_list_investigations',{description:'List waiting, failed or expired investigations in granted projects.',inputSchema:toolSchemas.gate_list_investigations,outputSchema:toolOutputSchema,annotations:read},({limit})=>result('gate_list_investigations',()=>investigations.list(principal,limit)));
+    server.registerTool('gate_start_investigation',{description:'Claim a proposal for ten minutes; returns the runId fencing token. No financial execution.',inputSchema:toolSchemas.gate_start_investigation,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_start_investigation',()=>investigations.start(principal,request_id,body,idempotency_key)));
+    server.registerTool('gate_submit_evidence',{description:'Submit imported source hashes, verified links and unresolved questions; Gate reevaluates and archives a new revision.',inputSchema:toolSchemas.gate_submit_evidence,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_submit_evidence',()=>investigations.submit(principal,request_id,body,idempotency_key)));
+    server.registerTool('gate_fail_investigation',{description:'Record an investigation failure with a reason. Another run may retry it.',inputSchema:toolSchemas.gate_fail_investigation,outputSchema:toolOutputSchema,annotations:{...read,readOnlyHint:false}},({request_id,idempotency_key,...body})=>result('gate_fail_investigation',()=>investigations.fail(principal,request_id,body,idempotency_key)));
     server.registerTool("gate_catalog", { description: "Discover assigned agents/projects, configured merchants and sandbox limits.", inputSchema: toolSchemas.gate_catalog, outputSchema: toolOutputSchema, annotations: read }, () => result("gate_catalog", () => service.catalog(principal)));
     server.registerTool("gate_search_context", { description: "Search allowed imported source IDs/content; results are bounded, not exhaustive.", inputSchema: toolSchemas.gate_search_context, outputSchema: toolOutputSchema, annotations: read }, ({ query }) => result("gate_search_context", async () => ({ items: await service.search(principal, query), limit: 50, exhaustive: false })));
     server.registerTool("gate_get_context", { description: "Retrieve an exact authorized source with verified context and citations.", inputSchema: toolSchemas.gate_get_context, outputSchema: toolOutputSchema, annotations: read }, ({ source_domain, source_id }) => result("gate_get_context", () => sourceContext(db, principal, source_domain, source_id)));

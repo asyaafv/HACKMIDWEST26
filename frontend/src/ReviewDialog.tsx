@@ -14,6 +14,6 @@ export function ReviewDialog({transaction,choice,onClose,onSaved}:{transaction:T
   <p><strong>{money(snapshot.current.amount)} USD</strong> · {snapshot.current.purpose}</p>
   <p>This review leaves the existing payment and budget records unchanged. Shared hackathon workspace.</p>
   <label className="field">Decision reason<textarea aria-label="Decision reason" value={reason} onChange={e=>setReason(e.target.value)} required maxLength={1000}/></label>
-  <div className="form-footer"><button type="button" className="button" disabled={busy} onClick={onClose}>Cancel</button><button className="button primary" disabled={busy||!reason.trim()}>Record {choice==='approve'?'approval':'rejection'}</button></div>
+  <div className="form-footer"><button type="button" className="button" disabled={busy} onClick={onClose}>Cancel</button><button className="button primary" disabled={busy||!reason.trim()||(choice==='approve'&&transaction.canApprove===false)}>Record {choice==='approve'?'approval':'rejection'}</button></div>
  </form></Dialog>;
 }
