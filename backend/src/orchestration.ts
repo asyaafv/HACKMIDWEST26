@@ -15,12 +15,18 @@ import { AGENT_IDS,DEVREV_ORG,factsFromRequest,stageMessage,validateFinal,escala
 
 const metadataSchema=z.object({phase:z.literal('gate-orchestration-2'),orgId:z.string().uuid(),requestId:z.string().uuid(),
  runId:z.string().uuid(),stageId:z.string().uuid(),ordinal:z.number().int().min(1).max(3),promptHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
-const eventSchema=z.object({agent:z.string().max(200),session:z.string().regex(/^don:core:dvrv-us-1:devo\/17WZM4zcjj:ai_agent_session\/[^:]+$/),
- session_object:z.string().max(200),client_metadata:metadataSchema,agent_response:z.enum(['progress','message','error']),
+export const orchestrationEventSchema=z.object({agent:z.string().max(200),session:z.string().regex(/^don:core:dvrv-us-1:devo\/17WZM4zcjj:ai_agent_session\/[^:]+$/),
+ session_object:z.string().max(200),client_metadata:metadataSchema,agent_response:z.enum(['progress','message','error','suggestions']),
  message:z.string().max(16000).optional(),error:z.object({error:z.string().max(2000)}).optional(),
  progress:z.object({progress_state:z.enum(['skill_triggered','skill_executed']),
   skill_triggered:z.object({skill_name:z.string().max(200),args:z.record(z.string(),z.unknown()).optional()}).optional(),
   skill_executed:z.object({skill_name:z.string().max(200),output:z.unknown()}).optional()}).optional()});
+export function parseOrchestrationEvent(raw:unknown) { return orchestrationEventSchema.parse(agentEvent(raw)); }
+export function hasVerifiedStageEvidence(stage:any) {
+ return stage?.dispatch_confirmed===true&&z.string().uuid().safeParse(stage?.tool_result?.traceId).success
+  &&typeof stage?.tool_result?.serverVersion==='string'&&typeof stage?.tool_result?.facts==='object'
+  &&stage.tool_result.facts!==null&&typeof stage?.final_result==='string'&&stage.final_result.length>0;
+}
 const terminal=new Set(['SUCCEEDED','FAILED','TIMED_OUT']);
 function gateToolEnvelopes(value:any,depth=0):any[] {
  if(depth>12||value==null)return [];
@@ -200,7 +206,7 @@ export class OrchestrationCoordinator {
    [run.org_id,run.id,timedOut?'TIMED_OUT':'FAILED',code,escalationDraft(run.request_id,findings,code)]);
  }
  private async advance(tx:Tx,run:any,stage:any) {
-  if(run.status!=='RUNNING'||terminal.has(stage.status)||!stage.dispatch_confirmed||!stage.tool_result||!stage.final_result)return;
+  if(run.status!=='RUNNING'||terminal.has(stage.status)||!hasVerifiedStageEvidence(stage))return;
   if(new Date(stage.expires_at).getTime()<=Date.now()){await this.fail(tx,run,stage,'DEVREV_TIMEOUT',true);return;}
   const current=(await tx.query('SELECT version FROM requests WHERE org_id=$1 AND id=$2 FOR SHARE',[run.org_id,run.request_id])).rows[0];
   if(current?.version!==run.snapshot.version){await this.fail(tx,run,stage,'STALE_REQUEST');return;}
@@ -288,7 +294,7 @@ export class OrchestrationCoordinator {
  }
  /** Called only behind authenticated webhook boundary. All evidence is sanitized before storage. */
  async receive(raw:unknown) {
-  const event=eventSchema.parse(agentEvent(raw)),m=event.client_metadata;
+  const event=parseOrchestrationEvent(raw),m=event.client_metadata;
   requireThat(m.orgId===this.settings.gateOrgId,'INVALID_ORCHESTRATION_EVENT','Organization mismatch.',409);
   return transaction(this.db,m.orgId,async tx=>{
    const run=(await tx.query('SELECT * FROM orchestration_runs WHERE org_id=$1 AND id=$2 FOR UPDATE',[m.orgId,m.runId])).rows[0];

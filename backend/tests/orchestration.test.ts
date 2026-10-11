@@ -127,6 +127,15 @@ it('requires actual tool output; final prose cannot advance, wrong agent/session
  const stale={...gate,data:{...gate.data,version:gate.data.version+1}};
  await coordinator().receive(event(stage,'progress',stale));expect((await details(id)).run.error_code).toBe('STALE_REQUEST');
 });
+it('records DevRev suggestions as informational callbacks without treating them as tool proof or advancing',async()=>{
+ const id=await start();await coordinator().runOnce();const stage=(await details(id)).stages[0];
+ const payload:any=event(stage,'message');payload.ai_agent_response.agent_response='suggestions';
+ delete payload.ai_agent_response.message;payload.ai_agent_response.suggestions=['Optional follow-up'];
+ expect(await coordinator().receive(payload)).toEqual({processed:true});
+ const result=await details(id);expect(result.run).toMatchObject({status:'RUNNING',current_stage:1});
+ expect(result.stages[0]).toMatchObject({status:'WAITING',tool_result:null,final_result:null});
+ expect(result.events.map((item:any)=>item.event.type)).toEqual(['suggestions']);
+});
 it('rejects unrestricted MCP proof, tool failures, mutation or unknown tool attempts and invented final findings',async()=>{
  for(const kind of ['unrestricted','tool-error','write-tool','unknown-tool','invented']) {
   const id=await start();await coordinator().runOnce();const stage=(await details(id)).stages[0],gate=await proof();
