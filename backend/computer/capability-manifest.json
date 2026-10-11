@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "transport": "stateless Streamable HTTP",
   "authentication": "Gate bearer; server-owned identity",
   "mode": "sandbox",
@@ -8,7 +8,7 @@
   "datasetVersion": "per-source; top-level null until a single active version is configured",
   "tools": [
     {
-      "name": "gate_capabilities",
+      "name": "gate_catalog",
       "capability": "catalog:read",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -67,6 +67,69 @@
         },
         "required": [
           "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {},
+          "mode": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "provider": {
+            "type": "string",
+            "const": "simulator"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "dataset_version": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "data",
+          "mode",
+          "provider",
+          "trace_id",
+          "server_version",
+          "dataset_version"
+        ],
+        "additionalProperties": false
+      },
+      "readOnly": true,
+      "idempotent": true
+    },
+    {
+      "name": "gate_get_context",
+      "capability": "context:read",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source_domain": {
+            "type": "string",
+            "enum": [
+              "pm",
+              "crm",
+              "document"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "source_domain",
+          "source_id"
         ],
         "additionalProperties": false
       },
@@ -340,222 +403,6 @@
       "idempotent": true
     },
     {
-      "name": "gate_get_request",
-      "capability": "request:read",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "request_id"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "data": {},
-          "mode": {
-            "type": "string",
-            "const": "sandbox"
-          },
-          "provider": {
-            "type": "string",
-            "const": "simulator"
-          },
-          "trace_id": {
-            "type": "string"
-          },
-          "server_version": {
-            "type": "string"
-          },
-          "dataset_version": {
-            "type": "null"
-          }
-        },
-        "required": [
-          "data",
-          "mode",
-          "provider",
-          "trace_id",
-          "server_version",
-          "dataset_version"
-        ],
-        "additionalProperties": false
-      },
-      "readOnly": true,
-      "idempotent": true
-    },
-    {
-      "name": "gate_explain_request",
-      "capability": "request:read",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "request_id"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "data": {},
-          "mode": {
-            "type": "string",
-            "const": "sandbox"
-          },
-          "provider": {
-            "type": "string",
-            "const": "simulator"
-          },
-          "trace_id": {
-            "type": "string"
-          },
-          "server_version": {
-            "type": "string"
-          },
-          "dataset_version": {
-            "type": "null"
-          }
-        },
-        "required": [
-          "data",
-          "mode",
-          "provider",
-          "trace_id",
-          "server_version",
-          "dataset_version"
-        ],
-        "additionalProperties": false
-      },
-      "readOnly": true,
-      "idempotent": true
-    },
-    {
-      "name": "gate_catalog",
-      "capability": "catalog:read",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "data": {},
-          "mode": {
-            "type": "string",
-            "const": "sandbox"
-          },
-          "provider": {
-            "type": "string",
-            "const": "simulator"
-          },
-          "trace_id": {
-            "type": "string"
-          },
-          "server_version": {
-            "type": "string"
-          },
-          "dataset_version": {
-            "type": "null"
-          }
-        },
-        "required": [
-          "data",
-          "mode",
-          "provider",
-          "trace_id",
-          "server_version",
-          "dataset_version"
-        ],
-        "additionalProperties": false
-      },
-      "readOnly": true,
-      "idempotent": true
-    },
-    {
-      "name": "gate_get_context",
-      "capability": "context:read",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "source_domain": {
-            "type": "string",
-            "enum": [
-              "pm",
-              "crm",
-              "document"
-            ]
-          },
-          "source_id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "source_domain",
-          "source_id"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "data": {},
-          "mode": {
-            "type": "string",
-            "const": "sandbox"
-          },
-          "provider": {
-            "type": "string",
-            "const": "simulator"
-          },
-          "trace_id": {
-            "type": "string"
-          },
-          "server_version": {
-            "type": "string"
-          },
-          "dataset_version": {
-            "type": "null"
-          }
-        },
-        "required": [
-          "data",
-          "mode",
-          "provider",
-          "trace_id",
-          "server_version",
-          "dataset_version"
-        ],
-        "additionalProperties": false
-      },
-      "readOnly": true,
-      "idempotent": true
-    },
-    {
       "name": "gate_list_requests",
       "capability": "request:read",
       "inputSchema": {
@@ -640,8 +487,8 @@
       "idempotent": true
     },
     {
-      "name": "gate_get_payment",
-      "capability": "payment:read",
+      "name": "gate_get_request",
+      "capability": "request:read",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -650,13 +497,11 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "payment_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
+        "required": [
+          "request_id"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -697,7 +542,6 @@
     }
   ],
   "constraints": {
-    "gate_get_payment": "Exactly one of request_id or payment_id",
     "gate_request_spend": "Explicit permission to record; same payload/key on retry; never finance consent",
     "outputBytes": 32768
   }

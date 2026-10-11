@@ -6,18 +6,19 @@ Local stateless Streamable HTTP SDK calls use real scoped Gate identities and sa
 
 The team supplied `https://hackmidwest26.onrender.com` as the intended public
 base URL. The candidate Gate endpoint is `https://hackmidwest26.onrender.com/mcp`.
-Public discovery on October 10, 2026 returned the historical Python three-tool
-contract, not the current authenticated Gate backend. See
-[Render deployment handoff](../docs/render-deployment.md) for observed responses
-and the required service change. DevRev registration remains unverified.
+The Render service now runs the authenticated TypeScript Gate backend. The
+DevRev connection must refresh discovery after deployment to pick up the
+seven-tool contract. The hosted PostgreSQL database already contains the
+18-record `SYNTHETIC_DEMO_DATA` seed; no second import is needed. DevRev
+registration remains unverified.
 
 For the API deployment, configure `HOST=0.0.0.0`, `APP_MODE=sandbox`,
-`DEV_CONSOLE=false`, `MCP_ALLOWED_HOSTS=hackmidwest26.onrender.com`, and
+`MCP_ALLOWED_HOSTS=hackmidwest26.onrender.com`, and
 `BROWSER_ALLOWED_HOSTS=hackmidwest26.onrender.com`. Let Render supply `PORT`.
 Set `ALLOWED_ORIGINS` to the exact actual frontend origin; use
 `https://hackmidwest26.onrender.com` only if the UI is served there. Store the real
-DATABASE_URL privately in the hosting service. Run the worker against that same
-persistent database. Never expose the local bearer-token test console publicly.
+DATABASE_URL privately in the hosting service. The current main dashboard
+records enterprise reviews without starting new payments.
 
 Before registering DevRev, verify `/health`, `/health/ready`, and unauthenticated
 `/mcp` denial from an external client, then authenticated MCP SDK discovery using
@@ -26,20 +27,19 @@ single testing environment does not establish that the deployed service is down.
 Gate currently provides bearer-authenticated MCP; confirm the team's DevRev
 connection supports this before choosing authentication fields.
 
-The API does not serve the built React app by itself. A public `/live` page requires
-a frontend deployment and same-origin API routing, or a separately configured
-frontend origin. The Vite proxy described in integration-flow.md is local only.
+The browser dashboard is a separate frontend deployment. DevRev uses the
+authenticated `/mcp` endpoint directly.
 
 ## Public deployment prerequisites
 
-1. Deploy persistent API, worker, and private PostgreSQL. Apply migrations using the admin/migration identity, including 030; run API and worker with the restricted runtime identity. Do not migrate or reset the shared development DB as a connector test.
+1. Deploy the API and private PostgreSQL. Apply migrations using the admin/migration identity, including the current transaction-review migration; run the API with the restricted runtime role. Do not reset the hosted database as a connector test. A worker is needed only if payment execution is deliberately enabled later.
 2. Terminate HTTPS at an approved public hostname. Configure an exact Host allowlist including actual forwarded host/port behavior. The proxy must preserve Authorization, Accept, Content-Type, MCP protocol headers and JSON bodies, and must not redirect `/mcp` to a login page. Configure `trustProxy` only for known proxy addresses with Chat 4; never trust arbitrary forwarded Host/IP headers. Restrict private backend ingress to that proxy.
 3. Configure exact allowed browser Origins (scheme, hostname, port), no wildcard. Pass these as attachMcp's fifth argument. Browser sessions use a host-only `__Host-gate_session` cookie: Secure, HttpOnly, SameSite=Strict. Use HTTPS for the browser origin. Cross-site UI hosting requires a separately reviewed cookie/CORS design; this default is same-site. MCP never authenticates from cookies.
 4. Provision one Gate AGENT identity/project/credential per submitting Gatekeeper using the commands below. A read-only investigator omits request:submit. TTL is 1–168 hours; default 24. Store the returned secret only in the approved connection secret store. It is a Gate credential, independent of DevRev/provider/finance credentials.
 5. Do not put secrets in URLs, source control, skills, screenshots or logs. Redact Authorization, Cookie, Set-Cookie, passwords and CSRF headers/bodies. Provisioning private output files use exclusive creation and mode 0600; keep them outside Git. Keep DB credentials in the host secret store. Rotate/revoke after the event and test next-call denial.
-6. Verify externally reachable authenticated SDK initialization/discovery and the ten versioned tools. Missing, expired and revoked tokens fail before tool disclosure. Validate wrong Host/Origin, source/request scope denial, and output errors. Tool output includes trace_id/server_version; dataset_version is null at the envelope until a single active version is configured, with actual source versions/hashes retained in evidence.
-7. Obtain the actual team skill and bindings. Review and hash a supplied version; install/bind through authorized platform controls only after verification. Read tools may be allowed; `gate_request_spend` needs explicit permission to record. This never grants finance consent. No arbitrary payment or finance-consent MCP tools exist.
-8. Record actual DevRev traces for context → advisory preview → permission to record → idempotent proposal → independent Gate finance consent → sandbox outcome → cited explanation. Include another authorized user's distinct credential/source, denied source, missing tool, negative trigger and timeout recovery. A shared connection is one Gate service identity; a chat name does not establish human identity.
+6. Verify externally reachable authenticated SDK initialization/discovery and the seven versioned tools. Missing, expired and revoked tokens fail before tool disclosure. Validate wrong Host/Origin, source/request scope denial, and output errors. Tool output includes trace_id/server_version; dataset_version is null at the envelope until a single active version is configured, with actual source versions/hashes retained in evidence.
+7. Update the existing DevRev skill and connector bindings to the seven names in `capability-manifest.json`; refresh cached connector discovery. `gate_request_spend` needs explicit permission to record. This never grants finance review or payment consent.
+8. Record actual DevRev traces for context → advisory preview → permission to record → idempotent proposal → independent Gate dashboard review → cited request state. Include another authorized user's distinct credential/source, denied source, missing tool, negative trigger and timeout recovery. A shared connection is one Gate service identity; a chat name does not establish human identity.
 
 ## Local provisioning and SDK commands
 
@@ -53,7 +53,7 @@ Run from backend with an administrative DATABASE_URL supplied privately. These s
 
 Agent input: orgId, projectId, name, optional investigator, capMinor, expiresInHours. It creates an AGENT principal, linked agent (existing owner_id binding), project grant and scoped credential. Human input: orgId, principalId, username, password (12–256 characters), for an existing active non-AGENT principal. Password replacement revokes prior sessions. Revoke input: orgId, credentialId. Do not use financial identity tokens to provision a Gatekeeper.
 
-Scenario input (private): url, token, proposal matching discovered camelCase schema, permissionToRecord, persisted idempotencyKey; optional requestId to recover an existing outcome. Save the key before invocation. The driver calls actual SDK tools, does not consent or execute payments, and prints returned business context/outcomes without the credential. After a network loss it first lists existing requests then retries the identical proposal/key once; it never automatically retries a domain denial or chooses a new key. Finance consents separately; invoke with requestId later for the actual outcome.
+Scenario input (private): url, token, proposal matching discovered camelCase schema, permissionToRecord, persisted idempotencyKey; optional requestId to recover an existing outcome. Save the key before invocation. The driver calls actual SDK tools, does not review or execute payments, and prints returned business context/outcomes without the credential. After a network loss it first lists existing requests then retries the identical proposal/key once; it never automatically retries a domain denial or chooses a new key. Finance reviews separately; invoke with requestId later to read policy, review and any historical payment through `gate_get_request`.
 
 ## Browser registration contract
 
