@@ -1,4 +1,5 @@
 /** REST boundary keeps shared demo reads/reviews separate from authenticated API and MCP workflows. */
+import { Investigations } from "./investigations.js";
 import { simulatePurchase } from "./simulation.js";
 import { demoPrincipal, reviewTransaction, type DemoWorkspace } from "./transaction-review.js";
 import Fastify from "fastify";
@@ -25,6 +26,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
   const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
   const service = new GateService(db);
+  const investigations = new Investigations(db,service);
   app.register(rateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: req => req.ip });
   const origins = options.origins ?? [];
   app.addHook("onRequest", async (req, reply) => {
@@ -64,6 +66,8 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       const result = await simulatePurchase(db,service,await demoPrincipal(db,options.demoWorkspace!),req.body,keySchema.parse(req.headers['idempotency-key']));
       reply.code(201);return {data:result,meta:{traceId:req.id}};
     });
+    demo.get('/transactions/:id/history', async req => ({data:await service.evaluationHistory(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}}));
+    demo.post('/transactions/:id/investigation', async req => ({data:await investigations.localRun(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
     demo.post('/transactions/:id/review', async req => ({data:await reviewTransaction(db,
       await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
   }, {prefix:'/v1/demo'});
@@ -110,6 +114,11 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
     api.post("/policy/preview", async req => wrap(await service.previewProposal(await principal(req), req.body), req.id));
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
+
+    api.get('/requests/:id/history', async req => wrap(await service.evaluationHistory(await principal(req),id(req)),req.id));
+    api.post('/requests/:id/investigation/start', async req => wrap(await investigations.start(await principal(req),id(req),req.body,key(req)),req.id));
+    api.post('/requests/:id/investigation/evidence', async req => wrap(await investigations.submit(await principal(req),id(req),req.body,key(req)),req.id));
+    api.post('/requests/:id/investigation/fail', async req => wrap(await investigations.fail(await principal(req),id(req),req.body,key(req)),req.id));
     api.get("/requests/:id/evidence", async req => wrap((await service.get(await principal(req), id(req))).evidence, req.id));
     api.post("/requests/:id/preview", async req => wrap(await service.preview(await principal(req), id(req), key(req)), req.id));
     api.post("/requests/:id/consent", async req => { requireThat(!!options.paymentExecution, "EXECUTION_DISABLED", "Gate records enterprise reviews without executing payments.", 403); return wrap(await service.consent(await principal(req), id(req), req.body, key(req)), req.id); });

@@ -15,5 +15,5 @@ it('refuses missing tools before calling any tool',async()=>{
 it('keeps the published manifest aligned with discovery signatures',async()=>{
  const manifest=JSON.parse(await readFile(new URL('../computer/capability-manifest.json',import.meta.url),'utf8'));expect(manifest.version).toBe(SERVER_VERSION);
  for(const [name,schema] of Object.entries(toolSchemas))expect(manifest.tools.find((t:any)=>t.name===name).inputSchema).toEqual(z.toJSONSchema(schema));
- expect(manifest.tools).toHaveLength(10);
+ expect(manifest.tools).toHaveLength(Object.keys(toolSchemas).length);
 });

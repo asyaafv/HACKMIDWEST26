@@ -26,7 +26,7 @@ export function GatekeeperForm({ agent, onClose }: { agent?: Gatekeeper; onClose
 /** Purchase proposals use assigned projects, authorized sources, and exact integer USD cents. */
 export function RequestForm({ onClose, onCreated, simulation = false }: { onClose: () => void; onCreated: (id: string) => void; simulation?: boolean }) {
  const {state,run,busy}=useDemo();const merchants=state!.merchants??[];
- const active=state!.agents.filter(a=>a.active&&(simulation||a.ownerId===state!.identity?.id));
+ const active=state!.agents.filter(a=>a.active&&(simulation?a.canPurchase!==false:a.ownerId===state!.identity?.id));
  const [agentId,setAgent]=useState(active[0]?.id??''),[merchantId,setMerchant]=useState(merchants[0]?.id??''),[amount,setAmount]=useState(''),[purpose,setPurpose]=useState(''),[query,setQuery]=useState(''),[sourceId,setSource]=useState(''),[sources,setSources]=useState<{domain:'pm'|'crm'|'document';source_id:string}[]>([]),[error,setError]=useState('');
  const [started,setStarted]=useState(false);
  const project=active.find(a=>a.id===agentId)?.projectId;

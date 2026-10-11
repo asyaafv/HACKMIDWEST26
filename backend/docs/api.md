@@ -1,3 +1,10 @@
+# Investigation lifecycle addition
+
+See gatekeeper-investigations.md for MCP 0.4.0, scoped claim/evidence/failure routes,
+report schemas and immutable reevaluation history. New proposals wait for an
+investigation before human review; missing evidence/hard denials prevent approval.
+The demo transaction investigation endpoint is an explicitly labeled local test.
+
 # Current no-login dashboard contract
 
 `GET /v1/demo/dashboard` reads the explicitly configured shared demo workspace.

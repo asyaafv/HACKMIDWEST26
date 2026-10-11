@@ -11,7 +11,7 @@ export const gatekeeperProvisionSchema=z.object({orgId:z.string().uuid(),project
 export async function provisionGatekeeper(db:DB,input:unknown) {
  const options=gatekeeperProvisionSchema.parse(input);
  const principalId=randomUUID(),agentId=randomUUID(),credentialId=randomUUID(),token=randomBytes(32).toString('hex');
- const capabilities=['catalog:read','context:read','request:read','request:preview','payment:read',...(options.investigator?[]:['request:submit'])];
+ const capabilities=['catalog:read','context:read','request:read','request:preview','payment:read',...(options.investigator?['investigation:write']:['request:submit'])];
  await transaction(db,options.orgId,async tx=>{
   requireThat((await tx.query('SELECT 1 FROM projects WHERE org_id=$1 AND id=$2',[options.orgId,options.projectId])).rowCount,'NOT_FOUND','Project not found.',404);
   await tx.query("INSERT INTO principals(id,org_id,name,role) VALUES($1,$2,$3,'AGENT')",[principalId,options.orgId,options.name]);
