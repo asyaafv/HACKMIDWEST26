@@ -48,7 +48,7 @@ export async function gateApiReady(base, origin) {
     const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500), ...(origin ? {headers:{Origin:origin}} : {}) });
     if (!health.ok) return false;
     const identity = await health.json();
-    if (identity.service !== 'gate-backend' || identity.dashboard !== true || identity.demoDashboard !== true || identity.paymentExecution !== false) return false;
+    if (identity.service !== 'gate-backend' || identity.dashboard !== true || identity.demoDashboard !== true || identity.paymentExecution !== true) return false;
     const ready = await fetch(`${base}/health/ready`, { signal: AbortSignal.timeout(1500) });
     if (!ready.ok) return false;
     return true;
@@ -229,13 +229,14 @@ async function main() {
     if (existingApi) console.log('[Gate] Reusing the existing healthy Gate API.');
     else await supervisor.start('api', ['run', 'dev'], backend, serviceEnv);
     await supervisor.waitFor(() => gateApiReady(apiUrl), 'Gate API');
+    await supervisor.start('worker', ['run', 'worker'], backend, serviceEnv);
     await supervisor.start('frontend', ['run', 'dev', '--', '--port', String(frontendPort), '--strictPort'], frontend, serviceEnv);
     await supervisor.waitFor(async () => {
       try { const response = await fetch(frontendUrl, { signal: AbortSignal.timeout(1500) }); return response.ok && /Gate/.test(await response.text()); } catch { return false; }
     }, 'frontend');
     await sleep(750);
     if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);
-    console.log(`\nGate is ready.\n  Gate dashboard: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Dashboard: opens directly, no login\n  Service logs: ${work}\n\nThe dashboard reads PostgreSQL records and records enterprise reviews. No payment worker is started.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
+    console.log(`\nGate is ready.\n  Gate dashboard: ${frontendUrl}\n  API: ${apiUrl}/v1\n  MCP: ${apiUrl}/mcp\n  Dashboard: opens directly, no login\n  Service logs: ${work}\n\nLow-risk purchases execute in the sandbox. Purchases over $1,000 and other review cases require approval.\nPress Ctrl+C to stop services started by this launcher. Existing services/data remain intact.\n`);
     if (args.has('--smoke')) { console.log('[Gate] Startup smoke check passed. Stopping owned services.'); return; }
     while (!stopRequested) {
       if (supervisor.unexpectedExit) throw new Error(supervisor.unexpectedExit);

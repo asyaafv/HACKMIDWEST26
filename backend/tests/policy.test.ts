@@ -1,7 +1,7 @@
 /** Boundary tests prove eligibility and missing evidence never become spending consent. */
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
-import { evaluate, type PolicyInput } from "../src/policy.js";
+import { evaluate, RISK_ALGORITHM, type PolicyInput } from "../src/policy.js";
 import { proposalSchema } from "../src/contracts.js";
 import { hash } from "../src/hash.js";
 import { verifyChain } from "../src/audit.js";
@@ -14,12 +14,12 @@ function input(amount = "50000"): PolicyInput {
 }
 describe("deterministic policy", () => {
   it("reviews one cent above the automatic threshold", () => {
-    expect(evaluate(input("50000")).verdict).toBe("APPROVE");
-    expect(evaluate(input("50001")).verdict).toBe("REVIEW");
-    expect(evaluate(input()).requiresHumanConsent).toBe(true);
+    expect(evaluate(input("100000")).verdict).toBe("APPROVE");
+    expect(evaluate(input("100001")).verdict).toBe("REVIEW");
+    expect(evaluate(input()).requiresHumanConsent).toBe(false);
   });
   it("returns an explicit backend approval recommendation for complete low-risk evidence", () => {
-    expect(evaluate(input("20000"))).toMatchObject({ verdict: "APPROVE", riskScore: 0, requiresHumanConsent: true,
+    expect(evaluate(input("20000"))).toMatchObject({ verdict: "APPROVE", riskScore: 0, requiresHumanConsent: false,
       riskAssessment: { computedBy: "BACKEND_POLICY", scoreType: "RULE_POINTS", level: "LOW", lowRisk: true } });
     const denied = input("20000"); denied.merchantStatus = "DENIED";
     expect(evaluate(denied)).toMatchObject({ verdict: "REJECT", riskScore: 0,
@@ -38,6 +38,35 @@ describe("deterministic policy", () => {
   it("missing evidence cannot execute even below threshold", () => {
     const value = input(); value.evidenceComplete = false;
     expect(evaluate(value)).toMatchObject({ verdict: "REVIEW", executionAllowed: false });
+  });
+  it("names and exposes the exact additive risk factors", () => {
+    const value = input("170000"); value.merchantStatus = "REVIEW"; value.duplicateIntent = true;
+    const decision = evaluate(value);
+    expect(decision.riskAlgorithm).toBe(RISK_ALGORITHM.name);
+    expect(decision.factors).toEqual([
+      { code: "AMOUNT", points: 20 }, { code: "MERCHANT", points: 25 }, { code: "DUPLICATE_INTENT", points: 20 },
+    ]);
+    expect(decision.riskScore).toBe(65);
+    expect(decision.reviewRequirements).toContainEqual({ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
+  });
+  it("requires human review when budget and daily pressure combine above 40 points", () => {
+    const value = input("40000"); value.budgetAvailableMinor = "50000"; value.dailyUsedMinor = "760000";
+    const decision = evaluate(value);
+    expect(decision.factors).toEqual([
+      { code: "BUDGET_PRESSURE", points: 20 }, { code: "DAILY_PRESSURE", points: 25 },
+    ]);
+    expect(decision).toMatchObject({ riskScore: 45, verdict: "REVIEW", executionAllowed: true });
+    expect(decision.reviewRequirements).toEqual([{ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" }]);
+    value.dailyUsedMinor = "759999";
+    expect(evaluate(value).riskScore).toBe(20);
+    expect(evaluate(value).verdict).toBe("APPROVE");
+  });
+  it("missing or contradictory evidence blocks execution even with high risk points", () => {
+    const value = input("300000"); value.evidenceComplete = false; value.contradictoryEvidence = true;
+    const decision = evaluate(value);
+    expect(decision.riskScore).toBe(100);
+    expect(decision).toMatchObject({ verdict: "REVIEW", executionAllowed: false });
+    expect(decision.reviewRequirements).not.toContainEqual({ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
   });
   it("denied merchant and disabled agent are hard failures", () => {
     const value = input(); value.merchantStatus = "DENIED";

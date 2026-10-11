@@ -37,7 +37,7 @@ beforeEach(async () => {
   await admin.query("INSERT INTO source_records VALUES($1,$2,$3,'UNIT','manifest','crm','PAY-TICKET','unit.json','','source-hash',$4)",
     [relatedId, controls.orgId, controls.projectId, { id: "PAY-TICKET" }]);
   await admin.query("INSERT INTO source_links VALUES($1,$2,$3,'/ticket')", [controls.orgId, primaryId, relatedId]);
-  proposal = { agentId: controls.agentId, projectId: controls.projectId, merchantId: controls.merchantId, amountMinor: "20000",
+  proposal = { agentId: controls.agentId, projectId: controls.projectId, merchantId: controls.merchantId, amountMinor: "170000",
     currency: "USD", category: "diagnostics", purpose: "Recovery test", source: { domain: "pm", sourceId: "PAY-ISSUE" } };
 });
 async function authorized() {
@@ -90,14 +90,14 @@ describe("payments recovery", () => {
     expect((await admin.query("SELECT count(*) FROM payments")).rows[0].count).toBe("0");
   });
   it("serializes concurrent finance consent against the live budget", async () => {
-    await admin.query("UPDATE budgets SET limit_minor=30000");
+    await admin.query("UPDATE budgets SET limit_minor=250000");
     const requests = await Promise.all([service.create(operator, proposal, randomUUID()), service.create(operator, { ...proposal, purpose: "Separate budget race" }, randomUUID())]);
     const previews = await Promise.all(requests.map(r => service.preview(finance, r.id, randomUUID())));
     const results = await Promise.allSettled(requests.map((r, i) => service.consent(finance, r.id,
       { choice: "approve", previewId: previews[i]!.id, previewHash: previews[i]!.previewHash,
-        expectedVersion: previews[i]!.expectedVersion, reason: "Concurrent test", reviewResolutions: [] }, randomUUID())));
+        expectedVersion: previews[i]!.expectedVersion, reason: "Concurrent test", reviewResolutions: previews[i]!.decision.reviewRequirements.map(r => r.code) }, randomUUID())));
     expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
-    expect((await admin.query("SELECT reserved_minor FROM budgets")).rows[0].reserved_minor).toBe("20000");
+    expect((await admin.query("SELECT reserved_minor FROM budgets")).rows[0].reserved_minor).toBe("170000");
   });
   it("expires an undispatched authorization and releases only once", async () => {
     const { paymentId } = await authorized();

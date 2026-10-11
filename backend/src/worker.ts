@@ -97,9 +97,9 @@ export class GateWorker {
 
   async reconcile(orgId: string, paymentId: string) {
     const payment = await transaction(this.db, orgId, async tx => {
-      const row = (await tx.query(`SELECT p.*,v.payload->>'destinationRef' AS destination_ref FROM payments p
-        JOIN approvals a ON a.org_id=p.org_id AND a.id=p.approval_id
-        JOIN previews v ON v.org_id=a.org_id AND v.id=a.preview_id
+      const row = (await tx.query(`SELECT p.*,COALESCE(v.payload,p.policy_snapshot)->>'destinationRef' AS destination_ref FROM payments p
+        LEFT JOIN approvals a ON a.org_id=p.org_id AND a.id=p.approval_id
+        LEFT JOIN previews v ON v.org_id=a.org_id AND v.id=a.preview_id
         WHERE p.org_id=$1 AND p.id=$2`, [orgId, paymentId])).rows[0];
       requireThat(row, "NOT_FOUND", "Payment not found.", 404);
       return { ...row, destinationRef: row.destination_ref };
@@ -147,7 +147,7 @@ export class GateWorker {
       const merchant = (await tx.query("SELECT * FROM merchants WHERE org_id=$1 AND id=$2 FOR SHARE", [orgId, request.merchant_id])).rows[0];
       const payment = (await tx.query("SELECT * FROM payments WHERE org_id=$1 AND id=$2 FOR UPDATE", [orgId, paymentId])).rows[0];
       if (payment.hold_state !== "HELD") return null;
-      const preview = (await tx.query(`SELECT p.* FROM approvals a JOIN previews p ON p.org_id=a.org_id AND p.id=a.preview_id
+      const preview = payment.policy_snapshot ? { payload: payment.policy_snapshot } : (await tx.query(`SELECT p.* FROM approvals a JOIN previews p ON p.org_id=a.org_id AND p.id=a.preview_id
         WHERE a.org_id=$1 AND a.id=$2`, [orgId, payment.approval_id])).rows[0];
       requireThat(hash(preview.payload) === payment.bound_hash, "INVALID_BINDING", "Authorization binding mismatch.");
       requireThat(hash(preview.payload.proposal) === hash(request.proposal) && payment.amount_minor === request.amount_minor && payment.amount_minor === preview.payload.proposal.amountMinor,
@@ -164,7 +164,8 @@ export class GateWorker {
           const record = (await tx.query("SELECT source_hash,manifest_hash,content FROM source_records WHERE org_id=$1 AND id=$2 AND project_id=$3", [orgId, item.id, request.project_id])).rows[0];
           if (!record || record.source_hash !== item.sourceHash || record.manifest_hash !== item.manifestHash || hash(record.content) !== hash(item.content)) sourceChanged = true;
         }
-        const stale = !credential || !approver || !ownerScope || sourceChanged || !agent.active || merchant.status === "DENIED" || preview.payload.agentVersion !== agent.version || preview.payload.merchantVersion !== merchant.version || preview.payload.destinationRef !== merchant.destination_ref || preview.payload.policyHash !== hash(POLICY);
+        const automaticValid = payment.policy_snapshot && request.decision.verdict === "APPROVE" && !request.decision.requiresHumanConsent;
+        const stale = !credential || (!approver && !automaticValid) || !ownerScope || sourceChanged || !agent.active || merchant.status === "DENIED" || preview.payload.agentVersion !== agent.version || preview.payload.merchantVersion !== merchant.version || preview.payload.destinationRef !== merchant.destination_ref || preview.payload.policyHash !== hash(POLICY);
         const expired = new Date(payment.expires_at).getTime() <= Date.now();
         if (stale || expired) {
           await finish(tx, orgId, paymentId, "CANCELLED", { reason: expired ? "AUTHORIZATION_EXPIRED" : "AUTHORIZATION_REVOKED", mode: "sandbox" }, expired ? "EXPIRED" : "CANCELLED");

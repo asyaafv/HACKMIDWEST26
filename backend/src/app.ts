@@ -73,8 +73,26 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       return {data:await service.validateDecision(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}};
     });
     demo.post('/transactions/:id/investigation', async req => ({data:await investigations.localRun(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
-    demo.post('/transactions/:id/review', async req => ({data:await reviewTransaction(db,
-      await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
+    demo.post('/transactions/:id/review', async req => {
+      const p = await demoPrincipal(db, options.demoWorkspace!);
+      const requestId = idSchema.parse((req.params as any).id);
+      const key = keySchema.parse(req.headers['idempotency-key']);
+      if (!options.paymentExecution) return {data:await reviewTransaction(db,p,requestId,req.body,key),meta:{traceId:req.id}};
+      const body = req.body as {choice:'approve'|'reject';reason:string;expectedVersion:number;snapshotHash:string};
+      const cached = await transaction(db,p.orgId,async tx => (await tx.query(
+        "SELECT response FROM idempotency_records WHERE org_id=$1 AND principal_id=$2 AND operation='request.preview' AND key=$3",
+        [p.orgId,p.id,key])).rows[0]);
+      if (!cached) {
+        const dashboard = await service.dashboard(p);
+        const row = dashboard.requests.find(r => r.id === requestId);
+        requireThat(row && row.version === body.expectedVersion && row.snapshotHash === body.snapshotHash,
+          'STALE_TRANSACTION','Refresh this request before deciding.',409);
+      }
+      const preview = await service.preview(p,requestId,key);
+      return {data:await service.consent(p,requestId,{choice:body.choice,reason:body.reason,
+        previewId:preview.id,previewHash:preview.previewHash,expectedVersion:preview.expectedVersion,
+        reviewResolutions:preview.decision.reviewRequirements.filter(r=>r.resolution==='HUMAN_JUDGMENT').map(r=>r.code)},key),meta:{traceId:req.id}};
+    });
   }, {prefix:'/v1/demo'});
 
   app.register(async api => {
