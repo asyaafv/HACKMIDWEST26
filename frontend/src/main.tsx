@@ -9,6 +9,9 @@ import '@fontsource/inter/latin-700.css';
 import '@fontsource/inter/latin-800.css';
 import { DemoProvider } from './context';
 import App from './App';
+import { GateEntrance } from './GateEntrance';
 import './styles.css';
 
-createRoot(document.getElementById('root')!).render(<StrictMode><BrowserRouter><DemoProvider><App /></DemoProvider></BrowserRouter></StrictMode>);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode><BrowserRouter><DemoProvider><GateEntrance><App /></GateEntrance></DemoProvider></BrowserRouter></StrictMode>,
+);

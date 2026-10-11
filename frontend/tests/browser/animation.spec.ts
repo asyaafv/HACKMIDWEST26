@@ -144,6 +144,7 @@ test('every character has a clean plate, stable personality and larger table por
   const assignments = await page.locator('.gatekeeper-card .animated-avatar').evaluateAll(es => es.map(e => e.getAttribute('data-motion')));
   expect(new Set(assignments).size).toBe(4);
   await page.reload();
+  await page.getByRole('button',{name:'Skip intro'}).click();
   await page.getByLabel('Local access token').fill('VISUAL_TEST_ONLY');
   await page.getByRole('button',{name:'Connect to backend'}).click();
   await expect(page.locator('.gatekeeper-card .animated-avatar')).toHaveCount(10);

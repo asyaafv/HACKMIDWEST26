@@ -136,6 +136,14 @@ components:
 
 # Design System: Gate
 
+## Cinematic welcome
+
+The user-authorized entrance is an Experience surface over the unchanged workspace. On each document visit, a 5.8-second procedural Three.js scene places a 3D interpretation of the rainbow logo behind a low-poly stone arch and iron portcullis. The surrounding workspace is temporarily grayscale, dimmed, softly blurred, and inert. Bright, bold green binary rain fills the entire viewport behind the gate, with 22px digits on desktop and 18px digits on mobile. The center is quieter to keep the gate and mascot as the focal point. The rain and the mascot's eye reflections share an animation clock. The reflections span the area inside each white eye ring as a transparent overlay: five columns of smaller, bold green digits with contrasting outlines, scrolling roughly three times faster at 62% opacity, with no dark backing, preserving the pupils, white highlights, and rainbow colors underneath. The mascot looks left, blinks, looks right, receives a decorative Approved check, passes through the rising gate, and immediately shrinks into the existing header logo on desktop, with both eyes open and no forward enlargement or wink. Mobile uses a centered shrink and fade. The mascot matches the original icon’s saturated diagonal bands, larger circular white eye rings, black capsule pupils, and centered white capsule highlights. This intro is the authorized exception to the header-only logo rule; the supplied raster remains intact.
+
+One elapsed-time timeline controls every phase. Normal routing does not replay the welcome; refresh, new document visits, and back-forward-cache restoration do. Skip intro and Escape release the workspace immediately. Reduced motion and graphics failure receive a 700 ms static welcome. Initialization has a one-second deadline. Audio is one best-effort synthesized ding; browser-blocked audio never plays later. No payment, policy, or transaction is approved by the decorative scene. GPU resources, listeners, rendering, and audio are released on exit.
+
+Entrance-only material colors extend the workspace palette: approval light `#8cffbe`, static check `#6bf5b2`, check border `#50c38c`, check backing `#112d22`, control border `#64716f`, control text `#e0e9e7`, key hint `#b1c4bd`, hover backing `#23322e`, hover border `#95b7a7`, and focus `#b0efd2`. The approval label is 16px, the quiet skip control 12px, and its nonessential Esc hint 10px. These values belong to the cinematic surface only.
+
 ## Overview
 
 **Creative North Star: "The Authorization Workspace"**

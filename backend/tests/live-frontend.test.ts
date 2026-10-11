@@ -45,6 +45,8 @@ it('main dashboard reviews a real MCP request without payments, jobs, or budget 
   const proposal={agentId:gatekeeper.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Main dashboard MCP request',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}};
   const request=await callGateTool(client,'gate_request_spend',{...proposal,idempotency_key:randomUUID()}) as {id:string};
   const page=await browser.newPage();page.setDefaultTimeout(5000);await page.goto(frontend);
+ await browserExpect(page.getByLabel('Local access token')).toBeAttached();
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
   await page.getByLabel('Local access token').fill(controls.identities.FINANCE!.token);await page.getByRole('button',{name:'Connect to backend'}).click();
   await browserExpect(page.getByRole('heading',{name:'Workspace overview'})).toBeVisible();
   await page.getByRole('button',{name:new RegExp(`Open ${request.id}`)}).click();
@@ -64,6 +66,8 @@ it('main dashboard reviews a real MCP request without payments, jobs, or budget 
 });
 it('main request form retries a committed lost response without duplicate records or fixture fallback',async()=>{
  const page=await browser.newPage();page.setDefaultTimeout(5000);await page.goto(frontend);
+ await browserExpect(page.getByLabel('Local access token')).toBeAttached();
+ if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
  await page.getByLabel('Local access token').fill(controls.identities.OPERATOR!.token);await page.getByRole('button',{name:'Connect to backend'}).click();
  await browserExpect(page.getByRole('heading',{name:'Workspace overview'})).toBeVisible();await page.getByRole('button',{name:'Create request',exact:true}).click();
  await page.getByLabel('Gatekeeper',{exact:true}).selectOption(controls.agentId);await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);

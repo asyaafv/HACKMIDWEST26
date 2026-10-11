@@ -9,6 +9,8 @@ test('database-backed empty state and read-only configuration replace the old de
 });
 test('backend authentication failure shows an error and no fixture records',async({page})=>{
  await page.route('**/v1/**',r=>r.fulfill({status:401,json:{error:{code:'UNAUTHENTICATED',message:'Invalid credential'}}}));
- await page.goto('/');await page.getByLabel('Local access token').fill('invalid');await page.getByRole('button',{name:'Connect to backend'}).click();
+ await page.goto('/');await expect(page.getByLabel('Local access token')).toBeAttached();
+ const skip=page.getByRole('button',{name:'Skip intro'});if(await skip.isVisible())await skip.click();
+ await page.getByLabel('Local access token').fill('invalid');await page.getByRole('button',{name:'Connect to backend'}).click();
  await expect(page.getByRole('alert')).toContainText('UNAUTHENTICATED');await expect(page.locator('tbody tr')).toHaveCount(0);
 });

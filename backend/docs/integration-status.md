@@ -31,3 +31,8 @@ browser acceptance covers MCP-to-main-dashboard review with zero payment/job/bud
 side effects and retained-key lost-response recovery. Updated launcher smoke was
 not run to completion because an existing user-owned launcher is active; it was
 preserved and must be restarted by its owning terminal.
+
+PR integration against current GitHub main preserves the Gate entrance animation.
+Merged validation: frontend build/backend typecheck, 64 backend tests, 30 frontend
+unit tests and 20 browser tests passed. Browser checks use a private frontend port
+and explicitly authenticate after the entrance; no other checkout is reused.
