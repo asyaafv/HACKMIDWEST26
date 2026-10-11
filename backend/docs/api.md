@@ -5,6 +5,13 @@ Returns `data.identity`, catalog, latest 50 requests with linked historical paym
 `transactionReview`, `snapshotHash`, and 100 related audit events. No browser login
 is required. Other REST and MCP routes remain authenticated.
 
+`GET /v1/demo/sources/search?q=...` returns authorized imported source selectors.
+`POST /v1/demo/purchases` accepts the existing Proposal body and Idempotency-Key.
+It resolves the purchasing agent's owner/provenance server-side, checks the shared
+reviewer's and owner's project grants, and uses the real evidence/policy creation
+service. Returns a request with `origin:SIMULATED_PURCHASE`; creates no payment.
+Host/Origin protections match demo review writes. No actual DevRev agent is invoked.
+
 `POST /v1/demo/transactions/:id/review` requires the configured Host/Origin,
 Idempotency-Key and `{choice:"approve"|"reject", reason, expectedVersion, snapshotHash}`.
 Returns `{requestId, choice, paymentExecution:false}` inside the normal data envelope.

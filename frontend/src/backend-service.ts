@@ -10,7 +10,7 @@ interface Catalog {
  policy: { version: string; automaticMaxMinor: string; dailyMaxMinor: string; dailyMaxRequests: number; reviewScoreThreshold: number; ttlSeconds: number };
 }
 interface RecordRow {
- id: string; version: number; createdAt: string; proposal: Proposal; workflowStatus: string; consentStatus: string; authorizationStatus: string;
+ id: string; version: number; origin?: string; createdAt: string; proposal: Proposal; workflowStatus: string; consentStatus: string; authorizationStatus: string;
  decision: { verdict: string; riskScore: number; policyVersion: string; rules: { code: string; result: string; actual?: string; threshold?: string }[]; factors: { code: string; points: number }[]; reviewRequirements: { code: string; resolution: string }[] };
  evidence: { items: { id: string; domain: string; sourceId: string; content: Record<string, unknown>; sourceHash: string }[]; missing: string[]; links: unknown[]; bundleHash: string };
  payment: unknown; snapshotHash: string; transactionReview: null | { choice: string; reason: string };
@@ -26,7 +26,7 @@ export class BackendService implements DemoDataService {
     // Historical requests can retain merchants omitted from the current catalog.
     for (const r of dashboard.requests) if (!merchants.some(m => m.id === r.proposal.merchantId)) merchants.push({id:r.proposal.merchantId,name:r.proposal.merchantId,category:'Historical vendor',domain:''});
     const transactions: Transaction[] = dashboard.requests.map(r => ({
-      id: r.id, agentId: r.proposal.agentId, merchantId: r.proposal.merchantId, amount: Number(r.proposal.amountMinor), priority: 'P2',
+      simulated: r.origin === 'SIMULATED_PURCHASE', id: r.id, agentId: r.proposal.agentId, merchantId: r.proposal.merchantId, amount: Number(r.proposal.amountMinor), priority: 'P2',
       decision: r.transactionReview?.choice === 'approve' ? 'Approved' : r.transactionReview?.choice === 'reject' ? 'Blocked' : 'Pending',
       reason: r.transactionReview?.reason, reviewBinding: {version:r.version,snapshotHash:r.snapshotHash},
       risk: r.decision.riskScore, createdAt: r.createdAt, purpose: r.proposal.purpose, project: c.projects.find(p => p.id === r.proposal.projectId)?.name ?? r.proposal.projectId,
@@ -47,7 +47,7 @@ export class BackendService implements DemoDataService {
     const signature = JSON.stringify(body);
     if (this.created && this.created.signature !== signature) throw new Error('Recover the previous submission or start a new request form before changing an uncertain action.');
     this.created ??= { signature, action: crypto.randomUUID() };
-    const result = await api.call<{ id: string }>('/requests', body, this.created.action); this.created.id = result.id;
+    const result = await api.call<{ id: string }>('/demo/purchases', body, this.created.action); this.created.id = result.id;
     const state = await this.load(); state.transactions.sort((a,b) => a.id === result.id ? -1 : b.id === result.id ? 1 : 0); return state;
   }
   newRequest() { this.created = null; }

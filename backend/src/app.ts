@@ -1,4 +1,5 @@
 /** REST boundary keeps shared demo reads/reviews separate from authenticated API and MCP workflows. */
+import { simulatePurchase } from "./simulation.js";
 import { demoPrincipal, reviewTransaction, type DemoWorkspace } from "./transaction-review.js";
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
@@ -56,6 +57,11 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     demo.get('/dashboard', async req => {
       const p = await demoPrincipal(db,options.demoWorkspace!);
       return {data:{...await service.dashboard(p),identity:{id:p.id,orgId:p.orgId,role:p.role,capabilities:p.capabilities,actorMode:'shared_hackathon_demo'}},meta:{traceId:req.id}};
+    });
+    demo.get('/sources/search', async req => ({data:{items:await service.search(await demoPrincipal(db,options.demoWorkspace!),String((req.query as any).q ?? ''))},meta:{traceId:req.id}}));
+    demo.post('/purchases', async (req,reply) => {
+      const result = await simulatePurchase(db,service,await demoPrincipal(db,options.demoWorkspace!),req.body,keySchema.parse(req.headers['idempotency-key']));
+      reply.code(201);return {data:result,meta:{traceId:req.id}};
     });
     demo.post('/transactions/:id/review', async req => ({data:await reviewTransaction(db,
       await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
