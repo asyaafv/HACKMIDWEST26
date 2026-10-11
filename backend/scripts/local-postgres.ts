@@ -2,9 +2,12 @@
 import EmbeddedPostgres from "embedded-postgres";
 import { access } from "node:fs/promises";
 
-const postgres = new EmbeddedPostgres({ databaseDir: "work/postgres", user: "gate", password: "gate_local_only", port: 55432,
-  persistent: true, postgresFlags: ["-h", "127.0.0.1"], onLog: () => {}, onError: () => {} });
-try { await access("work/postgres/PG_VERSION"); } catch { await postgres.initialise(); }
+// Keep native clusters separate: PostgreSQL data directories are not portable
+// between POSIX and Windows builds. Existing files in either location remain intact.
+const databaseDir = process.platform === "win32" ? "work/postgres-windows" : "work/postgres";
+const postgres = new EmbeddedPostgres({ databaseDir, user: "gate", password: "gate_local_only", port: 55432,
+  persistent: true, postgresFlags: ["-h", "127.0.0.1"], onLog: message => process.stderr.write(message), onError: error => console.error(error) });
+try { await access(`${databaseDir}/PG_VERSION`); } catch { await postgres.initialise(); }
 await postgres.start();
 const client = postgres.getPgClient();
 await client.connect();

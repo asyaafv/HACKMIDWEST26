@@ -11,7 +11,10 @@ export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const backend = resolve(root, 'backend');
 const frontend = resolve(root, 'frontend');
 const work = resolve(backend, 'work');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Windows cannot spawn npm.cmd without a shell; invoke npm's JS entry instead.
+const npm = process.platform === 'win32' ? process.execPath : 'npm';
+const npmEntry = process.platform === 'win32' ? resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js') : null;
+const npmArgs = args => npmEntry ? [npmEntry, ...args] : args;
 
 export async function fileExists(path) {
   try { await access(path); return true; } catch { return false; }
@@ -66,7 +69,7 @@ export class Supervisor {
   async start(name, args, cwd, env) {
     const logPath = resolve(work, `${name}.log`);
     const log = await open(logPath, 'w', 0o600);
-    const child = spawn(npm, args, { cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', log.fd, log.fd] });
+    const child = spawn(npm, npmArgs(args), { cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', log.fd, log.fd] });
     await log.close();
     const record = { name, child, logPath, exited: false };
     this.children.push(record);
@@ -107,7 +110,7 @@ export class Supervisor {
 async function command(name, args, cwd, env) {
   console.log(`[Gate] ${name}`);
   await new Promise((resolveCommand, reject) => {
-    const child = spawn(npm, args, { cwd, env, stdio: 'inherit' });
+    const child = spawn(npm, npmArgs(args), { cwd, env, stdio: 'inherit' });
     child.once('error', () => reject(new Error(`Cannot start npm for ${name}.`)));
     child.once('exit', code => code === 0 ? resolveCommand() : reject(new Error(`${name} failed. See the command output above.`)));
   });
@@ -170,7 +173,7 @@ async function acquireLock() {
 async function main() {
   const args = new Set(process.argv.slice(2));
   if ([...args].some(arg => !['--smoke', '--help'].includes(arg))) throw new Error('Usage: ./run-gate.sh [--smoke]');
-  if (args.has('--help')) { console.log('Run ./run-gate.sh to set up/start Gate. --smoke starts, checks readiness, then stops owned services. Ctrl+C stops owned services; existing services and payment data are preserved.'); return; }
+  if (args.has('--help')) { console.log('Run run-gate.cmd on Windows or ./run-gate.sh on macOS/Linux. The smoke option starts, checks readiness, then stops owned services. Ctrl+C stops owned services; existing services and payment data are preserved.'); return; }
   await mkdir(work, { recursive: true, mode: 0o700 });
   const releaseLock = await acquireLock();
   const supervisor = new Supervisor();

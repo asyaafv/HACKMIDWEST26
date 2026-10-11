@@ -11,6 +11,13 @@ From the repository root:
 ./run-gate.sh
 ```
 
+On Windows, double-click `run-gate.cmd`, or run `./run-gate.ps1` from PowerShell.
+Both Windows launchers run the same supervisor as the shell script. Use
+`./run-gate.ps1 -Smoke` to start, check readiness, and stop the services.
+The Windows launcher keeps its persistent local database in
+`backend/work/postgres-windows`. It is separate from the PostgreSQL database on
+Render; running the local app does not read or change Render data.
+
 Open the printed dashboard address (normally http://127.0.0.1:5173). The launcher
 starts PostgreSQL, applies migrations, prepares synthetic demo context without
 resetting history, and starts the API and frontend. It does **not** start a payment
