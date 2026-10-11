@@ -127,6 +127,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       const p = await demoPrincipal(db, options.demoWorkspace!);
       const requestId = idSchema.parse((req.params as any).id);
       const key = keySchema.parse(req.headers['idempotency-key']);
+      if (options.paymentExecution && (req.body as any)?.choice === 'reject') return {data:await service.rejectPending(p,requestId,req.body,key),meta:{traceId:req.id}};
       if (!options.paymentExecution) return {data:await reviewTransaction(db,p,requestId,req.body,key),meta:{traceId:req.id}};
       const body = req.body as {choice:'approve'|'reject';reason:string;expectedVersion:number;snapshotHash:string};
       const cached = await transaction(db,p.orgId,async tx => (await tx.query(

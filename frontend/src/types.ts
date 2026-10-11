@@ -11,7 +11,7 @@ export interface Investigation {status:'WAITING'|'INVESTIGATING'|'EVIDENCE_RECEI
 export interface RiskAssessment { computedBy:'BACKEND_POLICY';modelVersion:string;scoreType:'RULE_POINTS';score:number;maximum:number;reviewThreshold:number;level:'LOW'|'REVIEW_REQUIRED'|'BLOCKED';lowRisk:boolean;summary:string }
 export interface Transaction {
   riskAssessment?:RiskAssessment;
-  canApprove?:boolean;investigation?:Investigation|null;unresolvedQuestions?:string[];previousReview?:{choice:string;reason:string};
+  canApprove?:boolean;approvalBlockReason?:string;investigation?:Investigation|null;unresolvedQuestions?:string[];previousReview?:{choice:string;reason:string};
   id: string; agentId: string; merchantId: string; amount: number; priority: Priority;
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
   simulated?: boolean; category?: 'diagnostics'|'incident_response'; source?: {domain:'pm'|'crm'|'document';sourceId:string}; reviewRequirements?: {code:string;resolution:string}[];
