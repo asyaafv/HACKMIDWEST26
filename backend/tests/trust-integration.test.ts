@@ -82,6 +82,16 @@ it('keeps amount and simultaneous duplicate rules mandatory even with a valid ne
   expect((await admin.query('SELECT count(*) FROM payments WHERE request_id=$1',[request.id])).rows[0].count).toBe('0');
  }
 });
+it('never reopens a purchase denied by finance while the agent response is pending',async()=>{
+ const request=await create('100001'),a=await send(request.id);
+ const row=(await admin.query('SELECT * FROM requests WHERE id=$1',[request.id])).rows[0];
+ const finance=(await admin.query("SELECT * FROM principals WHERE org_id=$1 AND role='FINANCE'",[p.orgId])).rows[0];
+ const {transactionSnapshot}=await import('../src/transaction-review.js');
+ await service.rejectPending({...p,id:finance.id,role:'FINANCE',approvalLimitMinor:finance.approval_limit_minor},request.id,
+  {choice:'reject',reason:'Decline before agent finishes',expectedVersion:row.version,snapshotHash:transactionSnapshot(row,undefined)},randomUUID());
+ await trust().receive(callback(a,neutral(request.id)));
+ expect(await service.get(p,request.id)).toMatchObject({workflowStatus:'REJECTED',payment:null,trustAssessment:{failure_code:'STALE_REQUEST'}});
+});
 it('fails invented citations closed to review and fences cross-tenant or wrong-agent callback metadata',async()=>{
  const request=await create('23001'),a=await send(request.id),event=callback(a,neutral(request.id));
  const badAgent=structuredClone(event);badAgent.payload.ai_agent_response.agent='wrong-agent';

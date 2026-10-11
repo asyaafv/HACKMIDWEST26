@@ -3,6 +3,14 @@ import { seed } from '../../src/data';
 import { pendingRequests } from '../../src/decisions';
 
 describe('workspace decision ordering', () => {
+  it('includes pending requests while investigations are waiting, running or failed', () => {
+    const transactions = seed().transactions.slice(0,3);
+    transactions.forEach((t,i) => {
+      t.decision='Pending';
+      t.investigation={status:(['WAITING','INVESTIGATING','FAILED'] as const)[i],mode:null,run_id:null,started_at:null,evidence_received_at:null,evaluated_at:null,lease_until:null,failure_reason:null};
+    });
+    expect(pendingRequests(transactions)).toHaveLength(3);
+  });
   it('sorts by priority, oldest creation time, then ID without changing shared records', () => {
     const transactions = seed().transactions.slice(0, 5);
     const [low, newer, tieB, tieA, completed] = transactions;

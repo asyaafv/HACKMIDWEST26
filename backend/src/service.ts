@@ -11,7 +11,7 @@ import { evaluate, POLICY } from "./policy.js";
 import { hash } from "./hash.js";
 import { appendAudit } from "./audit.js";
 import { idempotent } from "./idempotency.js";
-import { transactionSnapshot } from "./transaction-review.js";
+import { transactionSnapshot, reviewSchema } from "./transaction-review.js";
 import { queueTrust, trustForRequest } from "./trust-store.js";
 import { GateWorker } from "./worker.js";
 
@@ -221,6 +221,25 @@ export class GateService {
       await appendAudit(tx, principal.orgId, principal.id, "request.created", id, { proposal, origin, evidenceHash: evidence.bundleHash, decision });
       if (await this.authorizeLowRisk(tx, principal, row)) row.status = "AUTHORIZED";
       return projection(row);
+    }));
+  }
+
+  /** Finance can decline a pending purchase before evidence/trust finishes; no authority is created. */
+  async rejectPending(principal: Principal, id: string, input: unknown, key: string) {
+    roleAccess(principal, ["FINANCE"]);
+    const body = reviewSchema.parse(input); keySchema.parse(key);
+    requireThat(body.choice === 'reject', 'INVALID_INPUT', 'A rejection is required.', 400);
+    return transaction(this.db, principal.orgId, tx => idempotent(tx, principal, 'request.reject_pending', key, {id,...body}, async () => {
+      const row = await requestRow(tx, principal, id, true);
+      const payment = (await tx.query('SELECT * FROM payments WHERE org_id=$1 AND request_id=$2 FOR SHARE',[principal.orgId,id])).rows[0];
+      requireThat(!payment && ['AWAITING_EVIDENCE','AWAITING_CONSENT'].includes(row.status), 'INVALID_STATE', 'Only a pending purchase can be denied.', 409);
+      requireThat(row.version === body.expectedVersion && transactionSnapshot(row,payment) === body.snapshotHash,
+        'STALE_TRANSACTION', 'Refresh this request before deciding.', 409);
+      await tx.query("UPDATE requests SET status='REJECTED',version=version+1 WHERE org_id=$1 AND id=$2",[principal.orgId,id]);
+      await tx.query("INSERT INTO transaction_reviews(org_id,request_id,actor_id,choice,reason,snapshot_hash,request_version) VALUES($1,$2,$3,'reject',$4,$5,$6)",
+        [principal.orgId,id,principal.id,body.reason,body.snapshotHash,row.version+1]);
+      await appendAudit(tx,principal.orgId,principal.id,'consent.declined',id,{reason:body.reason,reviewedVersion:row.version});
+      return {requestId:id,workflowStatus:'REJECTED',mode:'sandbox'};
     }));
   }
 
