@@ -1,5 +1,6 @@
 /** Gate Contextual Spend Risk (GCSR): deterministic review points, never a fraud probability. */
 import type { Proposal } from "./contracts.js";
+import { TRUST_MODEL } from "./trust-contracts.js";
 import { hash } from "./hash.js";
 
 export const RISK_ALGORITHM = Object.freeze({
@@ -10,10 +11,10 @@ export const RISK_ALGORITHM = Object.freeze({
     budgetPressure: 20, dailyPressure: 25 }),
 });
 export const POLICY = Object.freeze({
-  version: "gate-policy-v3", automaticMaxMinor: "100000", dailyMaxMinor: "1000000",
+  version: "gate-policy-v4", automaticMaxMinor: "100000", dailyMaxMinor: "1000000",
   dailyMaxRequests: 10, reviewScoreThreshold: 40, ttlSeconds: 300,
   riskModel: {
-    version: "gate-risk-v1", scoreType: "RULE_POINTS" as const, maximum: 100, largeAmountMinor: "200000",
+    version: "gate-risk-v2", scoreType: "RULE_POINTS" as const, maximum: 100, largeAmountMinor: "200000",
     factors: {
       amount: { label: "Amount above automatic review limit", points: 20 },
       largeAmount: { label: "Amount above large purchase limit", points: 35 },
@@ -24,6 +25,7 @@ export const POLICY = Object.freeze({
     },
   },
   riskAlgorithm: RISK_ALGORITHM,
+  trustModel: TRUST_MODEL,
 });
 export interface PolicyInput {
   proposal: Proposal;
@@ -36,6 +38,7 @@ export interface PolicyInput {
   evidenceComplete: boolean;
   duplicateIntent?: boolean;
   contradictoryEvidence?: boolean;
+  trust?: {status:"PENDING"|"COMPLETED"|"FAILED"; adjustment:number; unresolved:boolean};
 }
 export function evaluate(input: PolicyInput) {
   const amount = BigInt(input.proposal.amountMinor);
@@ -77,7 +80,12 @@ export function evaluate(input: PolicyInput) {
   if ((BigInt(input.dailyUsedMinor) + amount) * 100n >= BigInt(POLICY.dailyMaxMinor) * BigInt(RISK_ALGORITHM.dailyPressurePercent)) {
     factors.push({ code: "DAILY_PRESSURE", points: RISK_ALGORITHM.points.dailyPressure });
   }
-  const riskScore = Math.min(POLICY.riskModel.maximum, factors.reduce((sum, factor) => sum + factor.points, 0));
+  if (input.trust) {
+    if (input.trust.status === "PENDING") reviews.push({code:"TRUST_ASSESSMENT_PENDING",resolution:"NEW_EVIDENCE"});
+    else if (input.trust.status === "FAILED" || input.trust.unresolved) reviews.push({code:"TRUST_ASSESSMENT_REQUIRES_REVIEW",resolution:"HUMAN_JUDGMENT"});
+    if (input.trust.status === "COMPLETED") factors.push({code:"TRUST_HISTORY",points:Math.max(TRUST_MODEL.minimum,Math.min(TRUST_MODEL.maximum,input.trust.adjustment))});
+  }
+  const riskScore = Math.max(0, Math.min(POLICY.riskModel.maximum, factors.reduce((sum, factor) => sum + factor.points, 0)));
   if (riskScore >= POLICY.reviewScoreThreshold && !reviews.some(r => r.resolution === "NEW_EVIDENCE")) {
     reviews.push({ code: "RISK_REQUIRES_REVIEW", resolution: "HUMAN_JUDGMENT" });
   }
@@ -94,7 +102,7 @@ export function evaluate(input: PolicyInput) {
   };
   return {
     verdict, riskAssessment, riskScore, riskAlgorithm: RISK_ALGORITHM.name, factors, rules, reviewRequirements: reviews,
-    executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence,
+    executionAllowed: !denied && input.evidenceComplete && !input.contradictoryEvidence && input.trust?.status !== "PENDING",
     requiresHumanConsent: !denied && reviews.some(r => r.resolution === "HUMAN_JUDGMENT"), policyVersion: POLICY.version,
     policyHash: hash(POLICY), inputHash: hash(input),
   };

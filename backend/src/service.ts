@@ -12,6 +12,7 @@ import { hash } from "./hash.js";
 import { appendAudit } from "./audit.js";
 import { idempotent } from "./idempotency.js";
 import { transactionSnapshot } from "./transaction-review.js";
+import { queueTrust, trustForRequest } from "./trust-store.js";
 import { GateWorker } from "./worker.js";
 
 export async function requestRow(tx: Tx, principal: Principal, id: string, lock = false) {
@@ -36,7 +37,7 @@ async function context(tx: Tx, principal: Principal, proposal: Proposal, lock = 
   return { agent, merchant, budget };
 }
 
-async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx: Awaited<ReturnType<typeof context>>, complete: boolean, contradictoryEvidence = false, excludeRequestId?:string) {
+async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx: Awaited<ReturnType<typeof context>>, complete: boolean, contradictoryEvidence = false, excludeRequestId?:string, trustPending = false) {
   const velocity = (await tx.query(`SELECT COALESCE(sum(p.amount_minor),0)::text AS used,count(*)::integer AS count FROM payments p
     JOIN requests r ON r.org_id=p.org_id AND r.id=p.request_id
     WHERE p.org_id=$1 AND r.agent_id=$2 AND p.created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
@@ -50,7 +51,8 @@ async function decisionFor(tx: Tx, principal: Principal, proposal: Proposal, ctx
       AND r.created_at>=now()-interval '10 minutes' LIMIT 1`,
     [principal.orgId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor,
       proposal.source, proposal.category, proposal.purpose, excludeRequestId??null])).rows.length > 0;
-  return evaluate({ duplicateIntent: duplicate, contradictoryEvidence, proposal, agentActive: ctx.agent.active, agentCapMinor: ctx.agent.cap_minor,
+  const trust = excludeRequestId ? await trustForRequest(tx, principal.orgId, excludeRequestId) : trustPending ? {status:"PENDING" as const,adjustment:0,unresolved:false} : undefined;
+  return evaluate({ trust, duplicateIntent: duplicate, contradictoryEvidence, proposal, agentActive: ctx.agent.active, agentCapMinor: ctx.agent.cap_minor,
     merchantStatus: ctx.merchant.status,
     budgetAvailableMinor: (BigInt(ctx.budget.limit_minor) - BigInt(ctx.budget.spent_minor) - BigInt(ctx.budget.reserved_minor)).toString(),
     dailyUsedMinor: velocity.used, dailyCount: velocity.count, evidenceComplete: complete });
@@ -68,7 +70,29 @@ function projection(row: any, payment?: any, approval?: any) {
 }
 
 export class GateService {
-  constructor(public db: DB) {}
+  constructor(public db: DB, public options: {trustEnabled?:boolean;trustTimeoutSeconds?:number} = {}) {}
+
+  async applyTrustResult(tx: Tx, orgId: string, row: any) {
+    // Callback authority cannot impersonate an arbitrary user: recover the stored purchaser.
+    const owner = (await tx.query("SELECT * FROM principals WHERE org_id=$1 AND id=$2 AND active",[orgId,row.created_by])).rows[0];
+    const scope = (await tx.query("SELECT 1 FROM principal_projects WHERE org_id=$1 AND principal_id=$2 AND project_id=$3",[orgId,row.created_by,row.project_id])).rowCount;
+    if (!owner || !scope) {
+      await tx.query("UPDATE requests SET status='CANCELLED',version=version+1 WHERE org_id=$1 AND id=$2",[orgId,row.id]);
+      await appendAudit(tx,orgId,null,"trust.purchaser_unavailable",row.id,{});
+      return;
+    }
+    const principal: Principal = {id:owner.id,orgId,credentialId:row.credential_id,role:owner.role,approvalLimitMinor:owner.approval_limit_minor};
+    const ctx = await context(tx,principal,row.proposal,true);
+    const decision = await decisionFor(tx,principal,row.proposal,ctx,row.evidence.complete,
+      Boolean(row.evidence.unresolvedRequirements?.some((r:string)=>r.startsWith("CONTRADICTORY_FACT"))),row.id);
+    const version = row.version + 1;
+    const status = decision.verdict === "REJECT" ? "REJECTED" : decision.reviewRequirements.some(r=>r.resolution==="NEW_EVIDENCE") ? "AWAITING_EVIDENCE" : "AWAITING_CONSENT";
+    await tx.query("UPDATE requests SET decision=$3,status=$4,version=$5 WHERE org_id=$1 AND id=$2",[orgId,row.id,decision,status,version]);
+    await tx.query("INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+      [randomUUID(),orgId,row.id,version,row.proposal,hash(row.proposal),row.evidence,hash(row.evidence),decision,hash(decision)]);
+    await appendAudit(tx,orgId,null,"trust.evaluated",row.id,{version,decision});
+    await this.authorizeLowRisk(tx,principal,{...row,decision,version,status});
+  }
 
   /** Agent lock serializes distinct submissions before duplicate checks and reservations. */
   async authorizeLowRisk(tx: Tx, principal: Principal, row: any) {
@@ -110,7 +134,8 @@ export class GateService {
       ];
       const transactionReview = (await tx.query('SELECT * FROM transaction_reviews WHERE org_id=$1 AND request_id=$2 ORDER BY request_version DESC LIMIT 1',[principal.orgId,id])).rows[0] ?? null;
       const investigation=(await tx.query('SELECT * FROM investigations WHERE org_id=$1 AND request_id=$2',[principal.orgId,id])).rows[0] ?? null;
-      return { ...projection(row, payment, approval), transactionReview, investigation, permittedActions };
+      const trustAssessment = (await tx.query("SELECT id,status,adjustment,response,failure_code,created_at,completed_at FROM trust_assessments WHERE org_id=$1 AND request_id=$2",[principal.orgId,id])).rows[0] ?? null;
+      return { ...projection(row, payment, approval), transactionReview, investigation, trustAssessment, permittedActions };
     });
   }
 
@@ -181,12 +206,15 @@ export class GateService {
       const ctx = await context(tx, principal, proposal, true);
       requireThat(ctx.agent.owner_id === principal.id, "FORBIDDEN", "You may submit only for your assigned agent.", 403);
       const evidence = await collectEvidence(tx, principal, proposal);
-      const decision = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
+      const initial = await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))));
+      const trustRequired = !!this.options.trustEnabled && initial.verdict !== "REJECT";
+      const decision = trustRequired ? await decisionFor(tx, principal, proposal, ctx, evidence.complete, Boolean(evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), undefined, true) : initial;
       const status = decision.verdict === "REJECT" ? "REJECTED" : evidence.complete ? "AWAITING_CONSENT" : "AWAITING_EVIDENCE";
       const id = randomUUID();
-      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status,origin)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, status, origin])).rows[0];
+      const row = (await tx.query(`INSERT INTO requests(id,org_id,created_by,credential_id,agent_id,project_id,merchant_id,amount_minor,proposal,evidence,decision,status,origin,trust_required)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        [id, principal.orgId, principal.id, principal.credentialId, proposal.agentId, proposal.projectId, proposal.merchantId, proposal.amountMinor, proposal, evidence, decision, trustRequired ? "AWAITING_EVIDENCE" : status, origin, trustRequired])).rows[0];
+      if (trustRequired) await queueTrust(tx, principal, row, this.options.trustTimeoutSeconds ?? 60);
       await tx.query(`INSERT INTO request_revisions(id,org_id,request_id,revision,proposal,proposal_hash,evidence,evidence_hash,decision,decision_hash)
         VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9)`, [randomUUID(), principal.orgId, id, proposal, hash(proposal), evidence, hash(evidence), decision, hash(decision)]);
       await tx.query("INSERT INTO investigations(org_id,request_id,status) VALUES($1,$2,'WAITING')",[principal.orgId,id]);

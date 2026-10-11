@@ -1,4 +1,9 @@
 /** REST boundary keeps shared demo reads/reviews separate from authenticated API and MCP workflows. */
+import { timingSafeEqual } from "node:crypto";
+import { labelTrustHistory } from "./trust-store.js";
+import { TrustWorker } from "./trust-worker.js";
+import type { DevRevTrustSettings } from "./devrev-trust.js";
+import { hash } from "./hash.js";
 import { Investigations } from "./investigations.js";
 import { simulatePurchase } from "./simulation.js";
 import { demoPrincipal, reviewTransaction, type DemoWorkspace } from "./transaction-review.js";
@@ -22,10 +27,10 @@ import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
 import type { DevRevMcpIdentity } from "./devrev-auth.js";
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity } = {}) {
-  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.body.password"], level: "info" } : false,
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean } = {}) {
+  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
-  const service = new GateService(db);
+  const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds});
   const investigations = new Investigations(db,service);
   app.register(rateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: req => req.ip });
   const origins = options.origins ?? [];
@@ -46,7 +51,31 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     req.log.error({ code: "INTERNAL_ERROR", traceId: req.id }, "Gate request failed");
     return reply.code(500).send({ error: { code: "INTERNAL_ERROR", message: "Request could not be completed." }, meta: { traceId: req.id } });
   });
-  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox", dashboard: true, demoDashboard: !!options.demoWorkspace, paymentExecution: !!options.paymentExecution }));
+  const trust = options.trust ? new TrustWorker(db,service,options.trust) : undefined;
+  if (trust && options.trustPolling) {
+    let stopped = false, timer: ReturnType<typeof setTimeout> | undefined, inFlight: Promise<unknown> | undefined;
+    const poll = () => {
+      inFlight = trust.runOnce().catch(()=>app.log.warn({code:'TRUST_DEPENDENCY_UNAVAILABLE'},'Trust worker will retry.'))
+        .finally(()=>{if(!stopped){timer=setTimeout(poll,1000);timer.unref();}});
+    };
+    app.addHook('onReady',async()=>{timer=setTimeout(poll,0);timer.unref();});
+    app.addHook('onClose',async()=>{stopped=true;clearTimeout(timer);await inFlight;});
+  }
+  if (trust && options.trust?.webhookSecret) {
+    app.post('/v1/integrations/devrev/trust/webhook', async req => {
+      const header = req.headers['x-api-key'];
+      requireThat(typeof header==='string' && timingSafeEqual(Buffer.from(hash(header)),Buffer.from(hash(options.trust!.webhookSecret))),
+        'UNAUTHENTICATED','Valid DevRev webhook authentication required.',401);
+      const body = req.body as any;
+      if (body?.type==='verify' || body?.payload?.type==='verify') {
+        const challenge = body.challenge ?? body.payload?.challenge;
+        requireThat(typeof challenge==='string' && challenge.length>0 && challenge.length<=1024,'INVALID_INPUT','Verification challenge required.',400);
+        return {challenge};
+      }
+      return trust.receive(req.body);
+    });
+  }
+  app.get("/health", async () => ({ ok: true, service: "gate-backend", mode: "sandbox", dashboard: true, demoDashboard: !!options.demoWorkspace, paymentExecution: !!options.paymentExecution, trust: {enabled:!!options.trust?.enabled,webhookConfigured:!!options.trust?.webhookSecret} }));
   app.get("/health/ready", async () => { await db.query("SELECT 1"); return { ok: true, service: "gate-backend" }; });
   const browserHosts = options.browserHosts ?? ["localhost:8000", "127.0.0.1:8000"];
   app.register(authRoutes, { prefix: "/v1", db, origins, hosts: browserHosts });
@@ -136,6 +165,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));
     api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
     api.post("/policy/preview", async req => wrap(await service.previewProposal(await principal(req), req.body), req.id));
+    api.post("/requests/:id/trust-label", async req => wrap(await labelTrustHistory(db,await principal(req),id(req),req.body,key(req)),req.id));
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
     api.get("/requests/:id/validation", async (req,reply) => {
       reply.header('Cache-Control','no-store');
