@@ -65,8 +65,13 @@ function projection(row: any, payment?: any, approval?: any) {
     decision: row.decision, evidence: row.evidence, createdAt: row.created_at,
     mode: "sandbox", provider: "simulator", payment: payment ? {
       id: payment.id, status: payment.status, holdState: payment.hold_state, operationKey: payment.operation_key,
-      amountMinor: payment.amount_minor, receipt: payment.receipt, expiresAt: payment.expires_at,
+      amountMinor: payment.amount_minor, receipt: payment.receipt, expiresAt: payment.expires_at, createdAt: payment.created_at,
     } : null };
+}
+
+/** Investigation annotations are stored beside evidence, but source integrity compares only the collected records. */
+function evidenceSourceHash(evidence: any) {
+  return hash({items:evidence?.items??[],links:evidence?.links??[],missing:evidence?.missing??[],coverage:evidence?.coverage??null,referenceTime:evidence?.referenceTime??null});
 }
 
 export class GateService {
@@ -280,7 +285,7 @@ export class GateService {
         requireThat(row.created_by !== principal.id && ctx.agent.owner_id !== principal.id, "SELF_APPROVAL", "An independent finance approver is required.", 403);
         requireThat(BigInt(row.amount_minor) <= BigInt(principal.approvalLimitMinor), "APPROVAL_LIMIT", "Amount exceeds your approval authority.", 403);
         const currentEvidence = await collectEvidence(tx, principal, row.proposal);
-        requireThat(currentEvidence.bundleHash === row.evidence.bundleHash, "STALE_EVIDENCE", "Source evidence changed. Submit a new reviewed request.", 409);
+        requireThat(evidenceSourceHash(currentEvidence) === evidenceSourceHash(row.evidence), "STALE_EVIDENCE", "Source evidence changed. Submit a new reviewed request.", 409);
         const live = await decisionFor(tx, principal, row.proposal, ctx, row.evidence.complete, Boolean(row.evidence.unresolvedRequirements?.some((r: string) => r.startsWith("CONTRADICTORY_FACT"))), row.id);
         requireThat(live.executionAllowed, "POLICY_BLOCKED", "Current policy or required evidence prevents execution.");
         requireThat(preview.payload.policyHash === hash(POLICY) && preview.payload.agentVersion === ctx.agent.version && preview.payload.merchantVersion === ctx.merchant.version && preview.payload.destinationRef === ctx.merchant.destination_ref,

@@ -9,7 +9,7 @@ export async function mockBackend(page: Page, withRequests = true) {
 }
 export async function connectExistingFixture(page: Page) {
  const skip=page.getByRole('button',{name:'Skip intro'});if(await skip.isVisible())await skip.click();
- await expect(page.getByRole('link',{name:'Open profile settings'})).toBeAttached();
+ await expect(page.locator('.topbar .profile')).toBeAttached();
 }
 export async function connectFixture(page: Page, path: string, withRequests = true) {
  await mockBackend(page,withRequests);await page.goto(path);await connectExistingFixture(page);

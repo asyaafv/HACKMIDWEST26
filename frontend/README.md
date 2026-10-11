@@ -33,7 +33,7 @@ browser-local fixtures as fallback. Existing character art and entrance animatio
 remain presentation assets. See ../backend/docs/integration-flow.md for scope,
 review persistence, shared demo identity and deployment configuration.
 
-## Authenticated DevRev review integration (prepared, not deployed)
+## Authenticated finance review and DevRev orchestration
 
 Use the existing **Settings → Identity** section to sign in with an existing Gate
 human username/password. An OPERATOR or ADMIN with `request:read` and access to
@@ -55,16 +55,23 @@ Verify login cookie forwarding on the deployed Vercel domain after review.
 Signed-in reads use `/v1/auth/me` and `/v1/dashboard`, with backend project scopes.
 Anonymous reads retain the existing shared database demo; a server failure does
 not substitute sample data. Signed-in purchase simulation uses the authenticated
-request/preview/source endpoints and requires their existing capabilities. Human
-UI reviews use `/v1/requests/:id/transaction/review`, reusing the existing bound
-transaction-review mechanism: a reason, version and snapshot hash are required.
-It records a review annotation and audit event without financial consent,
-authorization, payment execution or budget changes. The separate finance consent
-API remains unchanged. A recorded UI review does not resolve missing evidence.
+request/preview/source endpoints and requires their existing capabilities.
+
+Finance actions require a signed-in FINANCE principal with `finance:consent`, an
+audit reason, current request version, independent approver, and amount within the
+reviewer's authority. Approve is available only when the backend says required
+evidence is complete and execution is permitted. It uses the existing preview and
+review endpoints; the backend records human consent and marks the request
+authorized, but this UI call explicitly sets `executePayment=false`, so it creates
+no payment, payment authorization, job, or budget reservation. Reject uses the
+authenticated pending-rejection endpoint and records the decision without creating
+a payment, payment authorization, payment job, or budget reservation. Both
+decisions remain explicit and auditable. Missing or
+contradictory evidence continues to block approval.
 
 Open `/transactions?request=9de772b5-4c6f-41b1-9510-46eb74ac28b9` to inspect the
 existing request. For this release, `DEVREV_ORCHESTRATION_ENABLED=false`, so the
-review button reports that orchestration is disabled and cannot start a run. In a
+orchestration control reports that orchestration is disabled and cannot start a run. In a
 future separately reviewed configuration, the button posts only the request ID
 with CSRF and an idempotency key, then displays persisted stage findings, sessions,
 MCP traces and human escalation. It never fabricates agent responses. Failed or

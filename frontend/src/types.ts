@@ -16,7 +16,8 @@ export interface Transaction {
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
   simulated?: boolean; category?: 'diagnostics'|'incident_response'; source?: {domain:'pm'|'crm'|'document';sourceId:string}; reviewRequirements?: {code:string;resolution:string}[];
   reviewBinding?: {version:number;snapshotHash:string};
-  workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; backend?: unknown; historicalPayment?: unknown; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
+  workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; executionAllowed?:boolean;requiresHumanConsent?:boolean;
+  backend?: unknown; historicalPayment?: {status?:string;holdState?:string;createdAt?:string|null;completedAt?:string|null}|null; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
 }
 export interface AuditEvent { id: string; type: 'request' | 'decision' | 'gatekeeper' | 'policy' | 'settings'; title: string; detail: string; createdAt: string; actor: string; transactionId?: string; agentId?: string }
 export interface Settings { name: string; initials: string; workspace: string; notifications: boolean; compact: boolean }

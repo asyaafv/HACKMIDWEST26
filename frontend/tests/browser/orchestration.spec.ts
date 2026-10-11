@@ -25,17 +25,17 @@ async function fixture(page:Page,ready=true,role='OPERATOR') {
  return ()=>posts;
 }
 test('existing panel starts a cookie-authenticated review and restores the persisted run without another start',async({page})=>{
- const posts=await fixture(page);const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
+ const posts=await fixture(page);await page.locator('.transaction-more > summary').click();const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
  await expect(panel.getByRole('button',{name:'Run DevRev review'})).toBeEnabled();await panel.getByRole('button',{name:'Run DevRev review'}).click();
  await expect(panel).toContainText(runId);await expect(panel).toContainText('Risk & Fraud: SUCCEEDED');await expect(panel).toContainText('Verified fixture finding 3');await expect(panel).toContainText('Independent human review required');
  await panel.getByText('DevRev execution records').click();await expect(panel).toContainText('fixture-trace-3');expect(posts()).toBe(1);
- await page.reload();await connectExistingFixture(page);await expect(panel).toContainText(runId);await expect(panel.getByRole('button',{name:'Run DevRev review'})).toBeDisabled();expect(posts()).toBe(1);
+ await page.reload();await connectExistingFixture(page);await page.locator('.transaction-more > summary').click();await expect(panel).toContainText(runId);await expect(panel.getByRole('button',{name:'Run DevRev review'})).toBeDisabled();expect(posts()).toBe(1);
 });
 test('reports missing backend configuration instead of fabricating a handoff',async({page})=>{
- const posts=await fixture(page,false);const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
+ const posts=await fixture(page,false);await page.locator('.transaction-more > summary').click();const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
  await expect(panel).toContainText('DevRev orchestration is disabled on the backend.');await expect(panel.getByRole('button',{name:'Run DevRev review'})).toBeDisabled();await expect(panel).not.toContainText('SUCCEEDED');expect(posts()).toBe(0);
 });
 test('finance cannot initiate advisory orchestration',async({page})=>{
- const posts=await fixture(page,true,'FINANCE');const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
+ const posts=await fixture(page,true,'FINANCE');await page.locator('.transaction-more > summary').click();const panel=page.getByRole('region',{name:'Gatekeeper investigation'});
  await expect(panel).toContainText('An authorized OPERATOR or ADMIN');await expect(panel.getByRole('button',{name:'Run DevRev review'})).toBeDisabled();expect(posts()).toBe(0);
 });

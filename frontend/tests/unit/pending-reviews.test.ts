@@ -13,7 +13,7 @@ it.each(['AWAITING_CONSENT','AWAITING_EVIDENCE'])('maps %s without hiding financ
  expect(transaction.decision).toBe('Pending');
  expect(transaction.canApprove).toBe(false); // Backend review requires the persisted investigation to finish.
  if(status==='AWAITING_EVIDENCE'){
-  expect(transaction.approvalBlockReason).toContain('required investigation');
+  expect(transaction.approvalBlockReason).toContain('missing or conflicting evidence');
   expect(transaction.unresolvedQuestions).toEqual(['CONTRADICTORY_FACT:test']);
  }
 });

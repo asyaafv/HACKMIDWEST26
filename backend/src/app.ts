@@ -200,6 +200,7 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       const p=await principal(req);roleAccess(p,['FINANCE']);
       return wrap(await reviewTransaction(db,p,id(req),req.body,key(req),'authenticated_human'),req.id);
     });
+    api.post('/requests/:id/reject', async req => wrap(await service.rejectPending(await principal(req), id(req), req.body, key(req)), req.id));
     api.post("/requests/:id/review", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req), false), req.id));
     api.get("/catalog", async req => wrap(await service.catalog(await principal(req)), req.id));
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));

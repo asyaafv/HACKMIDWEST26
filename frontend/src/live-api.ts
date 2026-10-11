@@ -25,12 +25,12 @@ export class LiveApi {
     } catch { throw new Error(action ? 'Response lost. Retry the identical action; its key is retained.' : 'Backend unavailable.'); }
     let result;
     try {result=await response.json();}catch{throw new Error('Backend returned an invalid response. Check the /v1 proxy and backend deployment.');}
-    if (!response.ok) throw new ApiError(response.status,result.error?.code??String(response.status),`${result.error?.message ?? 'Request failed'}, trace ${result.meta?.traceId ?? 'unavailable'}`);
+    if (!response.ok) throw new ApiError(response.status,result.error?.code??String(response.status),result.error?.message ?? 'Request failed.',result.meta?.traceId);
     return result.data as T;
   }
 }
 export class ApiError extends Error {
-  constructor(public status:number,public code:string,message:string){super(`${code}: ${message}`);}
+  constructor(public status:number,public code:string,message:string,public traceId?:string){super(message);}
 }
 /** Parse decimal dollars using integer arithmetic; reject rounding and exponent formats. */
 export function minorUnits(value: string) {

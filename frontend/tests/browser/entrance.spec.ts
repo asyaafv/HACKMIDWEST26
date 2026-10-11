@@ -66,7 +66,7 @@ for (const mobile of [false, true]) {
       if (keyboard) { await brand.focus(); await page.keyboard.press('Enter'); }
       else await brand.locator('img').click();
       await scene(page);
-      await expect(page).toHaveURL(/overview/);
+      await expect(page).toHaveURL(/transactions/);
       await expect(page.getByRole('button', { name: 'Skip intro' })).toBeFocused();
       expect(await page.locator('.entrance-workspace').evaluate(e => (e as HTMLElement).inert)).toBe(true);
       await page.clock.fastForward(3250);
@@ -134,7 +134,7 @@ test('mobile completes without overflow or a hidden-logo flight', async ({ page 
   await page.clock.fastForward(1000); await released(page);
   await connectExistingFixture(page);
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(page.getByRole('link', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Transactions', exact: true })).toBeVisible();
 });
 
 test('direct mobile request keeps its own scroll lock and focus after welcome and automatic load', async ({ page }) => {

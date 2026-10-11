@@ -69,29 +69,71 @@ it('authenticated transaction annotations enforce finance access and preserve fi
  expect(await counts()).toEqual(before);expect((await service.get(finance,request.id)).version).toBe(record.version);
  expect((await admin.query('SELECT packet->\'details\'->>\'actorMode\' AS mode FROM audit_events WHERE packet->>\'resourceId\'=$1 AND packet->>\'event\'=\'transaction.rejected\'',[request.id])).rows[0].mode).toBe('authenticated_human');
 });
-it('opens without login, polls actual MCP records, and replays a lost review response once', async () => {
- const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(frontend);
- if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
- await browserExpect(page.getByRole('heading',{name:'Workspace overview'})).toBeVisible();
- await browserExpect(page.getByLabel('Local access token')).toHaveCount(0);
+it('authenticated pending rejection is finance-only and creates no payment or authorization records',async()=>{
+ const service=new GateService(runtime),operator=await authenticate(runtime,`Bearer ${controls.identities.OPERATOR!.token}`),financeToken=controls.identities.FINANCE!.token;
+ const request=await service.create(operator,{agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Authenticated pending rejection test',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}},randomUUID());
+ const record=(await service.dashboard(await authenticate(runtime,`Bearer ${financeToken}`))).requests.find(r=>r.id===request.id)!;
+ const body={choice:'reject',reason:'Required evidence remains unresolved.',expectedVersion:record.version,snapshotHash:record.snapshotHash};
+ const counts=async()=>Promise.all(['payments','authorizations','jobs','simulator_transactions','budget_entries','approvals'].map(async table=>(await admin.query(`SELECT count(*) FROM ${table} WHERE ${['jobs','simulator_transactions','budget_entries'].includes(table)?'payment_id IN (SELECT id FROM payments WHERE request_id=$1)':'request_id=$1'}`,[request.id])).rows[0].count));
+ const before=await counts(),key=randomUUID();
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/reject`,headers:{'idempotency-key':randomUUID()},payload:body})).statusCode).toBe(401);
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/reject`,headers:{authorization:`Bearer ${controls.identities.OPERATOR!.token}`,'idempotency-key':randomUUID()},payload:body})).statusCode).toBe(403);
+ const headers={authorization:`Bearer ${financeToken}`,'idempotency-key':key};
+ const response=await app.inject({method:'POST',url:`/v1/requests/${request.id}/reject`,headers,payload:body});
+ expect(response.statusCode).toBe(200);expect(response.json().data.workflowStatus).toBe('REJECTED');
+ expect((await app.inject({method:'POST',url:`/v1/requests/${request.id}/reject`,headers,payload:body})).statusCode).toBe(200);
+ expect(await counts()).toEqual(before);
+ expect((await service.get(await authenticate(runtime,`Bearer ${financeToken}`),request.id)).workflowStatus).toBe('REJECTED');
+});
+it('authenticated approval endpoint records human review without creating payment authority or reserving budget',async()=>{
+ const service=new GateService(runtime),operator=await authenticate(runtime,`Bearer ${controls.identities.OPERATOR!.token}`),finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`);
+ const request=await service.create(operator,{agentId:controls.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Authenticated review-only approval test',source:{domain:'pm',sourceId:'GATE-ISSUE-101'}},randomUUID());
+ const reviewed=await new Investigations(runtime,service).localRun(finance,request.id,{expectedVersion:request.version},randomUUID());
+ expect(reviewed.workflowStatus).toBe('AWAITING_CONSENT');expect(reviewed.decision.executionAllowed).toBe(true);
+ const host=new URL(base).host,headers={host,authorization:`Bearer ${controls.identities.FINANCE!.token}`};
+ const counts=async()=>Promise.all(['payments','authorizations','jobs','simulator_transactions','budget_entries'].map(async table=>(await admin.query(`SELECT count(*) FROM ${table} WHERE ${['jobs','simulator_transactions','budget_entries'].includes(table)?'payment_id IN (SELECT id FROM payments WHERE request_id=$1)':'request_id=$1'}`,[request.id])).rows[0].count));
+ const before=await counts(),previewKey=randomUUID();
+ const previewResponse=await app.inject({method:'POST',url:`/v1/requests/${request.id}/preview`,headers:{...headers,'idempotency-key':previewKey},payload:{}});
+ expect(previewResponse.statusCode).toBe(200);const preview=previewResponse.json().data;
+ const response=await app.inject({method:'POST',url:`/v1/requests/${request.id}/review`,headers:{...headers,'idempotency-key':randomUUID()},payload:{choice:'approve',reason:'Independent finance review complete.',previewId:preview.id,previewHash:preview.previewHash,expectedVersion:preview.expectedVersion,reviewResolutions:preview.decision.reviewRequirements.filter((item:any)=>item.resolution==='HUMAN_JUDGMENT').map((item:any)=>item.code)}});
+ expect(response.statusCode,JSON.stringify(response.json())).toBe(200);expect(response.json().data).toMatchObject({workflowStatus:'AUTHORIZED',paymentExecution:false});
+ expect(await counts()).toEqual(before);
+ const row=(await service.dashboard(finance)).requests.find(item=>item.id===request.id)!;expect(row.workflowStatus).toBe('AUTHORIZED');
+ expect((await admin.query('SELECT count(*) FROM approvals WHERE request_id=$1 AND choice=\'approve\'',[request.id])).rows[0].count).toBe('1');
+});
+it('authenticated finance records a review without executing payment and safely retries a lost response', async () => {
+ const page=await browser.newPage();page.setDefaultTimeout(10000);
+ await provisionHumanLogin(admin,controls.orgId,controls.identities.FINANCE!.id,'ui-finance-reviewer','isolated-finance-password');
+ const service=new GateService(runtime),finance=await authenticate(runtime,`Bearer ${controls.identities.FINANCE!.token}`);
  const gatekeeper=await provisionGatekeeper(admin,{orgId:controls.orgId,projectId:controls.projectId,name:'Integration Gatekeeper'});
  const client=new Client({name:'transaction dashboard acceptance',version:'1.0.0'});
  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${gatekeeper.token}`}}}));
  try {
   const request=await callGateTool(client,'gate_request_spend',{agentId:gatekeeper.agentId,projectId:controls.projectId,merchantId:controls.merchantId,amountMinor:'170001',currency:'USD',category:'diagnostics',purpose:'Automatically discovered MCP transaction',source:{domain:'pm',sourceId:'GATE-ISSUE-101'},idempotency_key:randomUUID()}) as {id:string};
-  await page.getByRole('button',{name:new RegExp(`Open ${request.id}`)}).click();
-  await page.getByRole('button',{name:'Run local investigation',exact:true}).click();
-  await browserExpect(page.getByText('Policy evaluated',{exact:true}).first()).toBeVisible();
-  await page.getByRole('button',{name:'Approve transaction',exact:true}).click();await page.getByLabel('Decision reason').fill('Reviewed enterprise context');
-  await page.route('**/v1/demo/transactions/*/review',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/review');});
-  await page.getByRole('button',{name:'Record approval'}).click();await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
-  await page.getByRole('button',{name:'Record approval'}).click();await browserExpect(page.locator('dialog')).toHaveCount(0);
-  expect((await admin.query('SELECT count(*) FROM transaction_reviews WHERE request_id=$1',[request.id])).rows[0].count).toBe('1');
-  expect((await admin.query("SELECT count(*) FROM audit_events WHERE packet->>'event'='transaction.approved'")).rows[0].count).toBe('1');
-  for(const table of ['payments','jobs','simulator_transactions','budget_entries'])expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
-  await page.reload();if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
-  await browserExpect(page.getByRole('heading',{name:'Authorization queue'})).toBeVisible();
-  await browserExpect(page.getByText('Reviewed enterprise context',{exact:true})).toBeVisible();
+  const latest=await service.get(finance,request.id);
+  const evaluated=await new Investigations(runtime,service).localRun(finance,request.id,{expectedVersion:latest.version},randomUUID());
+  expect(evaluated.workflowStatus).toBe('AWAITING_CONSENT');
+  const financialCounts=async()=>Promise.all(['payments','authorizations','jobs','simulator_transactions','budget_entries'].map(async table=>(await admin.query(`SELECT count(*) FROM ${table} WHERE ${['jobs','simulator_transactions','budget_entries'].includes(table)?'payment_id IN (SELECT id FROM payments WHERE request_id=$1)':'request_id=$1'}`,[request.id])).rows[0].count));
+  const before=await financialCounts(),budgetBefore=(await admin.query('SELECT reserved_minor,spent_minor FROM budgets WHERE project_id=$1',[controls.projectId])).rows[0];
+  await page.goto(`${frontend}/settings`);if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
+  await page.getByLabel('Username',{exact:true}).fill('ui-finance-reviewer');await page.getByLabel('Password',{exact:true}).fill('isolated-finance-password');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();await browserExpect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();
+  await page.getByRole('link',{name:'Transactions',exact:true}).click();
+  const row=page.locator('tbody tr').filter({hasText:'Automatically discovered MCP transaction'});await row.getByRole('button').click();
+  const panel=page.locator('.detail-panel');await browserExpect(panel).toBeVisible();
+  await browserExpect(panel.getByText('Automatically discovered MCP transaction',{exact:true})).toBeVisible();
+  await page.getByLabel('Decision reason').fill('Reviewed enterprise evidence and policy findings.');
+  await browserExpect(panel.getByRole('button',{name:'Approve purchase',exact:true})).toBeEnabled();
+  await page.route(`**/v1/requests/${request.id}/review`,async route=>{await route.fetch();await route.abort('failed');await page.unroute(`**/v1/requests/${request.id}/review`);});
+  await panel.getByRole('button',{name:'Approve purchase',exact:true}).click();await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
+  await panel.getByRole('button',{name:'Approve purchase',exact:true}).click();
+  await browserExpect(page.locator('.success-toast')).toContainText('Finance approval recorded. No payment was executed.');
+  await browserExpect(panel.getByRole('button',{name:'Approve purchase',exact:true})).toHaveCount(0);
+  expect(await financialCounts()).toEqual(before);
+  expect((await admin.query('SELECT reserved_minor,spent_minor FROM budgets WHERE project_id=$1',[controls.projectId])).rows[0]).toEqual(budgetBefore);
+  expect((await admin.query('SELECT count(*) FROM approvals WHERE request_id=$1 AND choice=\'approve\'',[request.id])).rows[0].count).toBe('1');
+  await browserExpect(panel.getByText('APPROVED',{exact:true}).first()).toBeVisible();
+  await browserExpect(panel.getByText('No payment created',{exact:true})).toBeVisible();
  }finally{await client.close();await page.close();}
 });
 it('reviews existing payments without financial mutations and rejects stale, racing, and foreign-origin actions',async()=>{
@@ -121,12 +163,12 @@ it('reviews existing payments without financial mutations and rejects stale, rac
  expect((await app.inject({url:'/dev-console',headers:{host}})).statusCode).toBe(404);
  const disabled=createApp(runtime);try{expect((await disabled.inject({url:'/v1/demo/dashboard'})).statusCode).toBe(404);}finally{await disabled.close();}
 });
-it('Gatekeepers simulation button saves one evaluated proposal after a lost response and creates no payment',async()=>{
- const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(`${frontend}/gatekeepers`);
+it('Transactions can save a sandbox request after a lost response without creating payment records',async()=>{
+ const page=await browser.newPage();page.setDefaultTimeout(10000);await page.goto(`${frontend}/transactions`);
  if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
- await browserExpect(page.getByRole('heading',{name:'Gatekeepers',exact:true})).toBeVisible();
+ await browserExpect(page.getByRole('heading',{name:'Transactions',exact:true})).toBeVisible();
  await browserExpect(page.getByRole('button',{name:'Create Gatekeeper',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await page.getByRole('button',{name:'New sandbox request',exact:true}).click();
  await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
  await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
  await page.getByLabel('Amount (USD)',{exact:true}).fill('1742.35');
@@ -144,16 +186,18 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
  await page.getByRole('dialog',{name:'Simulate purchase',exact:true}).getByRole('button',{name:'Record simulated request',exact:true}).click();
  await browserExpect(page.getByRole('dialog',{name:'Simulate purchase',exact:true})).toHaveCount(0);
- await browserExpect(page.getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
- await browserExpect(page.getByText('Simulated purchase proposal · imported synthetic context. Payments use the local sandbox provider.',{exact:true})).toBeVisible();
+ await browserExpect(page.locator('.detail-panel').getByText('Simulated agent purchase from Gatekeepers',{exact:true})).toBeVisible();
+ await browserExpect(page.getByText('Sandbox request',{exact:true}).first()).toBeVisible();
+ await page.locator('.transaction-more > summary').click();
  await browserExpect(page.getByText('Waiting for Gatekeeper',{exact:true}).first()).toBeVisible();
- await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toBeDisabled();
+ await browserExpect(page.getByRole('button',{name:'Approve purchase',exact:true})).toHaveCount(0);
+ await browserExpect(page.getByRole('button',{name:'Reject purchase',exact:true})).toHaveCount(0);
  await page.route('**/v1/demo/transactions/*/investigation',async route=>{await route.fetch();await route.abort('failed');await page.unroute('**/v1/demo/transactions/*/investigation');});
  await page.getByRole('button',{name:'Run local investigation',exact:true}).click();
  await browserExpect(page.getByRole('alert').first()).toContainText('Response lost');
  await page.getByRole('button',{name:/Run local investigation|Recheck demo evidence/}).click();
  await browserExpect(page.getByText('Policy evaluated',{exact:true}).first()).toBeVisible();
- await browserExpect(page.getByRole('button',{name:'Approve transaction',exact:true})).toBeEnabled();
+ await browserExpect(page.getByRole('button',{name:'Approve purchase',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Validate decision',exact:true}).click();
  await browserExpect(page.getByRole('heading',{name:'Saved decision matches current backend checks',exact:true})).toBeVisible();
  await page.getByText('Backend risk algorithm',{exact:true}).click();
@@ -169,9 +213,9 @@ it('Gatekeepers simulation button saves one evaluated proposal after a lost resp
  const host=new URL(base).host;
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,projectId:randomUUID()}})).statusCode).toBe(404);
  expect((await app.inject({method:'POST',url:'/v1/demo/purchases',headers:{host,origin:frontend,'idempotency-key':randomUUID()},payload:{...rows[0].proposal,amountMinor:'1.5'}})).statusCode).toBe(400);
- await page.goto(`${frontend}/gatekeepers`);
+ await page.goto(`${frontend}/transactions`);
  if(await page.getByRole('button',{name:'Skip intro'}).isVisible())await page.getByRole('button',{name:'Skip intro'}).click();
- await page.getByRole('button',{name:'Simulate purchase',exact:true}).click();
+ await page.getByRole('button',{name:'New sandbox request',exact:true}).click();
  await page.getByLabel('Purchasing agent',{exact:true}).selectOption(controls.agentId);
  await page.getByLabel('Merchant',{exact:true}).selectOption(controls.merchantId);
  await page.getByLabel('Amount (USD)',{exact:true}).fill('1742.35'); // Duplicate detection requires the same exact amount.

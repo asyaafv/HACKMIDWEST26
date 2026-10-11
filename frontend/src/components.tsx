@@ -10,8 +10,8 @@ export function Avatar({ agent, size = 72, selected = false }: { agent: Gatekeep
 export function MerchantImage({ merchant, size = 36 }: { merchant: Merchant; size?: number }) {
   return merchant.logo ? <img className={`merchant-image merchant-image-${merchant.id}`} src={merchant.logo} alt="" width={size} height={size} /> : <span className="merchant-space" style={{ width: size, height: size }} aria-hidden="true" />;
 }
-export function Status({ value, large = false }: { value: Decision; large?: boolean }) {
-  return <span className={`status ${value.toLowerCase()} ${large ? 'status-large' : ''}`}>{large && value === 'Approved' && <CheckCircle size={22} weight="fill" />}{large && value === 'Blocked' && <WarningCircle size={22} />}{large ? value.toUpperCase() : value}</span>;
+export function Status({ value, large = false, label }: { value: Decision; large?: boolean; label?:string }) {
+  return <span className={`status ${value.toLowerCase()} ${large ? 'status-large' : ''}`}>{large && value === 'Approved' && <CheckCircle size={22} weight="fill" />}{large && value === 'Blocked' && <WarningCircle size={22} />}{large ? (label??value).toUpperCase() : (label??value)}</span>;
 }
 export function PriorityBadge({ value }: { value: Priority }) { return <span className={`priority ${value.toLowerCase()}`}>{value}</span>; }
 export function Empty({ title }: { title: string }) { return <div className="empty"><h3>{title}</h3></div>; }
