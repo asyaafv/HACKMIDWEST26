@@ -542,36 +542,33 @@ Finance may resolve only `HUMAN_JUDGMENT` requirements within its role. `NEW_EVI
   "requireHumanConsent": true,
   "allowPartialEvidenceExecution": false,
   "allowedCategories": ["incident_response", "diagnostics"],
-  "engineVersion": "Gate-policy-v1"
+  "engineVersion": "gate-policy-v2",
+  "riskAlgorithm": "Gate Contextual Spend Risk (GCSR)"
 }
 ```
 
 These thresholds are Gate demo controls, stored separately from synthetic business evidence. The fictional records do not themselves authorize spending.
 
-### 8.4 Explainable heuristic
+### 8.4 Gate Contextual Spend Risk (GCSR)
 
-Score = `min(100, sum(points))`. Keep factor computation deterministic and visible:
-
-- Amount > $500: +20; amount > $2,000: +35 instead of +20.
-- Merchant status `REVIEW`: +25.
-- Required evidence incomplete: +30 and execution blocked independently.
-- Contradictory required evidence: +35 and execution blocked independently.
-- No verified source link to related context: +25 and execution blocked independently.
-- Snapshot beyond configured retrieval revalidation interval: +10; refresh required for execution if source is mutable.
-- Related authorized/paid requests in last ten minutes meet configured burst threshold: +15; daily hard cap still independent.
-- Same agent/merchant/primary-source/amount fingerprint exists on a different request in last ten minutes: +20 and a duplicate-intent review requirement.
-
-No “trust score” reduces the score in P0. No factor treats customer ARR as permission. Do not describe a score of 60 as a 60% fraud likelihood.
-
-Verdict:
+GCSR is a deterministic **review-points heuristic**, versioned with the policy. It is not a fraud probability. Let `a` be proposed cents, `b` the remaining project budget in cents, `d` today's held/captured agent spend in cents, and `L = 1,000,000` cents the daily cap. Indicator `I(condition)` is 1 when true and 0 otherwise.
 
 ```text
-if any hard deny fails -> REJECT
-else if any required review exists or score >= 40 -> REVIEW
-else -> APPROVE
+A = 0 if a <= 50,000; 20 if 50,000 < a <= 200,000; 35 if a > 200,000
+M = 25 I(merchant status = REVIEW)
+E = 30 I(required evidence incomplete)
+D = 20 I(duplicate business intent found within ten minutes)
+C = 35 I(required evidence contradictory)
+B = 20 I(b > 0 and 100a >= 80b)
+V = 25 I(100(d + a) >= 80L)
+GCSR(a,b,d,...) = min(100, A + M + E + D + C + B + V)
 ```
 
-S1 scores 0 if all controls and evidence pass. S2 scores 20 but enters `REVIEW` because amount exceeds $500. S3 is `REJECT` irrespective of score. Seed scenario fingerprint/burst isolation so the main demo is not accidentally influenced by previous test requests.
+`B` and `V` measure use of the remaining budget and daily allowance. Equality at 80% adds the points. The score is capped at 100; no positive evidence subtracts points. ARR never grants permission. The returned decision includes each factor and its points so the sum can be checked.
+
+Human review is required when the amount exceeds $500, the merchant is marked `REVIEW`, duplicate intent is detected, or GCSR reaches 40 points. Missing or contradictory required evidence instead requires **new evidence** and blocks execution until reevaluation; a finance reason cannot override it. Any hard denial (inactive agent, denied merchant, cap/budget violation) yields `REJECT` regardless of score. An eligible `APPROVE` still requires explicit human consent to the exact sandbox payment preview.
+
+Examples: S1 ($200 with ample limits) scores 0. S2 ($1,700) scores 20 and requires review because it exceeds $500. A $400 purchase using 80% of the remaining project budget and bringing daily spend to 80% of its cap scores `20 + 25 = 45`, so it requires review. S3 remains `REJECT` even if its GCSR score is low.
 
 ### 8.5 Time and evidence freshness
 
