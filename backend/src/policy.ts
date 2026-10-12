@@ -2,6 +2,7 @@
 import type { Proposal } from "./contracts.js";
 import { TRUST_MODEL } from "./trust-contracts.js";
 import { hash } from "./hash.js";
+import { AGENT_RISK_RULES } from './agent-review.js';
 
 export const RISK_ALGORITHM = Object.freeze({
   name: "Gate Contextual Spend Risk", code: "GCSR", version: 1,
@@ -22,8 +23,10 @@ export const POLICY = Object.freeze({
       missingEvidence: { label: "Required evidence missing", points: 30 },
       duplicate: { label: "Duplicate business intent", points: 20 },
       contradiction: { label: "Contradictory evidence", points: 35 },
+      ...Object.fromEntries(Object.values(AGENT_RISK_RULES).map(rule => [rule.factor, { label: rule.label, points: rule.points }])),
     },
   },
+  agentRiskRules: AGENT_RISK_RULES,
   riskAlgorithm: RISK_ALGORITHM,
   trustModel: TRUST_MODEL,
 });

@@ -29,6 +29,8 @@
     "test:integration": "vitest run tests/workflow.test.ts tests/payments-recovery.test.ts tests/auth-gatekeepers.test.ts",
     "test:concurrency": "vitest run tests/workflow.test.ts -t \"serializes|executors|oversubscribe\"",
     "test:mcp": "vitest run tests/workflow.test.ts tests/auth-gatekeepers.test.ts -t \"MCP|SDK|tool|scoped|investigator\"",
+    "orchestration:test": "vitest run tests/orchestration.test.ts",
+    "orchestration:test:readonly": "node --env-file-if-exists=.env --import tsx scripts/orchestration-smoke.ts",
     "devrev:prepare": "node --import tsx scripts/devrev-trust-setup.ts prepare",
     "devrev:register-webhook": "node --env-file-if-exists=.env --import tsx scripts/devrev-trust-setup.ts register"
   },

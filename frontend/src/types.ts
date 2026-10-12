@@ -16,11 +16,12 @@ export interface Transaction {
   decision: Decision; risk: number; createdAt: string; purpose: string; project: string;
   simulated?: boolean; category?: 'diagnostics'|'incident_response'; source?: {domain:'pm'|'crm'|'document';sourceId:string}; reviewRequirements?: {code:string;resolution:string}[];
   reviewBinding?: {version:number;snapshotHash:string};
-  workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; backend?: unknown; historicalPayment?: unknown; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
+  workflowStatus?: string; policyVerdict?: string; authorizationStatus?: string; executionAllowed?:boolean;requiresHumanConsent?:boolean;
+  backend?: unknown; historicalPayment?: {status?:string;holdState?:string;createdAt?:string|null;completedAt?:string|null}|null; analysis?: { factors: {code:string;points:number}[]; missing:string[]; policyVersion:string; links:unknown[] }; paymentMethod: string; evidence: Evidence[]; checks: PolicyCheck[]; reason?: string;
 }
 export interface AuditEvent { id: string; type: 'request' | 'decision' | 'gatekeeper' | 'policy' | 'settings'; title: string; detail: string; createdAt: string; actor: string; transactionId?: string; agentId?: string }
 export interface Settings { name: string; initials: string; workspace: string; notifications: boolean; compact: boolean }
-export interface DemoState { version: 1; agents: Gatekeeper[]; transactions: Transaction[]; policies: Policy[]; events: AuditEvent[]; settings: Settings; merchants?: Merchant[]; identity?: { id: string; role: string; orgId: string; capabilities: string[] }; catalog?: { projects: {id:string;name:string}[]; budgets: {project_id:string;limit_minor:string;spent_minor:string;reserved_minor:string}[]; policy: unknown }; bounded?: boolean }
+export interface DemoState { version: 1; agents: Gatekeeper[]; transactions: Transaction[]; policies: Policy[]; events: AuditEvent[]; settings: Settings; merchants?: Merchant[]; identity?: { id: string; role: string; orgId: string; capabilities: string[]; authenticated?:boolean }; catalog?: { projects: {id:string;name:string}[]; budgets: {project_id:string;limit_minor:string;spent_minor:string;reserved_minor:string}[]; policy: unknown }; bounded?: boolean }
 export interface GatekeeperInput { name: string; description: string; department: string; avatar: number }
 export interface RequestInput { agentId: string; merchantId: string; amount: number; priority: Priority; purpose: string; project: string; source?: { domain: 'pm'|'crm'|'document'; sourceId: string }; category?: 'diagnostics'|'incident_response' }
 export interface DemoDataService {

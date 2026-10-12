@@ -27,7 +27,7 @@ export async function demoPrincipal(db: DB, workspace: DemoWorkspace): Promise<P
       capabilities: ['request:read','catalog:read','context:read','finance:consent'] };
   });
 }
-export async function reviewTransaction(db: DB, principal: Principal, requestId: string, input: unknown, key: string) {
+export async function reviewTransaction(db: DB, principal: Principal, requestId: string, input: unknown, key: string, actorMode='shared_hackathon_demo') {
   const body = reviewSchema.parse(input); keySchema.parse(key);
   return transaction(db, principal.orgId, tx => idempotent(tx, principal, 'transaction.review', key, {requestId,...body}, async () => {
     // Lock the request before its payment, so competing reviewers cannot both commit.
@@ -44,7 +44,7 @@ export async function reviewTransaction(db: DB, principal: Principal, requestId:
     await tx.query('INSERT INTO transaction_reviews(org_id,request_id,actor_id,choice,reason,snapshot_hash,request_version) VALUES($1,$2,$3,$4,$5,$6,$7)',
       [principal.orgId,requestId,principal.id,body.choice,body.reason,body.snapshotHash,body.expectedVersion]);
     await appendAudit(tx,principal.orgId,principal.id,`transaction.${body.choice === 'approve' ? 'approved' : 'rejected'}`,requestId,
-      { ...body, actorMode: 'shared_hackathon_demo', paymentExecution: false });
+      { ...body, actorMode, paymentExecution: false });
     return { requestId, choice: body.choice, paymentExecution: false };
   }));
 }

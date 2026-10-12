@@ -14,14 +14,14 @@ interface Validation {
 }
 
 export function DecisionValidation({transaction}:{transaction:Transaction}) {
-  const {busy}=useDemo();
+  const {busy,state}=useDemo();
   const [checking,setChecking]=useState(false),[result,setResult]=useState<Validation|null>(null),[error,setError]=useState('');
   const mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   async function validate() {
     setChecking(true);setError('');setResult(null);
     try {
-      const next=await api.call<Validation>(`/demo/transactions/${transaction.id}/validation`);
+      const next=await api.call<Validation>(state?.identity?.authenticated?`/requests/${transaction.id}/validation`:`/demo/transactions/${transaction.id}/validation`);
       if(!mounted.current)return;
       if(next.requestVersion!==transaction.reviewBinding?.version)throw new Error('This request changed. Refresh its details and validate again.');
       setResult(next);

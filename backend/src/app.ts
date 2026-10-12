@@ -19,26 +19,51 @@ import { httpAuthenticate } from "./sessions.js";
 import { enforceHttpCapability } from "./capabilities.js";
 import { proposalSchema } from "./contracts.js";
 import { randomUUID } from "node:crypto";
-import { ZodError } from "zod";
+import { ZodError,z } from "zod";
 import type { DB } from "./db.js";
 import { GateService } from "./service.js";
 import { GateError, requireThat } from "./errors.js";
 import { apiSchemas, idSchema, keySchema } from "./contracts.js";
 import { attachMcp } from "./mcp.js";
 import type { DevRevMcpIdentity } from "./devrev-auth.js";
+import { OrchestrationCoordinator } from './orchestration.js';
+import type { OrchestrationSettings } from './orchestration-contracts.js';
+import { authenticatedWebhook,verificationChallenge } from './devrev-async.mjs';
+const ZodOrchestrationStart=z.object({requestId:z.string().uuid()}).strict();
+const ZodOrchestrationRecovery=z.object({acknowledgeReadOnlyReplay:z.literal(true)}).strict();
+const ZodDemoReviewStart=z.object({}).strict();
 
-export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean } = {}) {
-  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.body.password"], level: "info" } : false,
+export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: string[]; logger?: boolean; developmentFaults?: boolean; paymentExecution?: boolean; browserHosts?: string[]; demoWorkspace?: DemoWorkspace; demoReview?:{enabled:boolean;accessKey:string}; devrevIdentity?: DevRevMcpIdentity; trust?:DevRevTrustSettings; trustPolling?:boolean; orchestration?:OrchestrationSettings; orchestrationPolling?:boolean } = {}) {
+  const app = Fastify({ logger: options.logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-csrf-token", "req.headers.x-api-key", "req.headers.x-gate-demo-review-key", "req.body.password"], level: "info" } : false,
     bodyLimit: 32768, genReqId: () => randomUUID() });
-  const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds});
+  const service = new GateService(db,{trustEnabled:options.trust?.enabled,trustTimeoutSeconds:options.trust?.timeoutSeconds,
+    devrevOrchestrationEnabled:options.orchestration?.enabled});
   const investigations = new Investigations(db,service);
+  const coordinator=options.orchestration?new OrchestrationCoordinator(db,service,options.orchestration):undefined;
+  if(coordinator&&options.orchestration?.enabled)service.setAutomaticReviewStarter((orgId,requestId)=>coordinator.startAutomaticForRequest(orgId,requestId));
+  if(coordinator&&options.orchestrationPolling&&(options.orchestration?.enabled||options.orchestration?.demoReviewEnabled)) {
+    let stopped=false,timer:ReturnType<typeof setTimeout>|undefined,inFlight:Promise<unknown>|undefined;
+    const poll=()=>{inFlight=coordinator.runOnce().catch(()=>app.log.warn({code:'ORCHESTRATION_DEPENDENCY_UNAVAILABLE'},'Orchestration worker unavailable.'))
+      .finally(()=>{if(!stopped){timer=setTimeout(poll,1000);timer.unref();}});};
+    app.addHook('onReady',async()=>{timer=setTimeout(poll,0);timer.unref();});
+    app.addHook('onClose',async()=>{stopped=true;clearTimeout(timer);await inFlight;});
+  }
+  if(coordinator&&options.orchestration?.webhookSecret) {
+    app.post('/v1/integrations/devrev/orchestration/webhook',{bodyLimit:262144},async req=>{
+      requireThat(authenticatedWebhook(req.headers['x-api-key'],options.orchestration!.webhookSecret),'UNAUTHENTICATED','Valid webhook authentication required.',401);
+      const challenge=verificationChallenge(req.body);
+      if(challenge!==undefined)return {challenge};
+      return coordinator.receive(req.body);
+    });
+  }
   app.register(rateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: req => req.ip });
+  app.addHook('onSend',async(req,reply,payload)=>{if(req.url.startsWith('/v1/'))reply.header('Cache-Control','private, no-store');return payload;});
   const origins = options.origins ?? [];
   app.addHook("onRequest", async (req, reply) => {
     if (req.headers.origin) {
       requireThat(origins.includes(req.headers.origin), "ORIGIN_FORBIDDEN", "Origin not allowed.", 403);
       reply.header("Access-Control-Allow-Origin", req.headers.origin).header("Vary", "Origin");
-      reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-CSRF-Token");
+      reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-CSRF-Token, X-Gate-Demo-Review-Key");
       reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     }
     if (req.method === "OPTIONS") return reply.code(204).send();
@@ -101,6 +126,23 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       reply.header('Cache-Control','no-store');
       return {data:await service.validateDecision(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id)),meta:{traceId:req.id}};
     });
+    if(options.demoReview?.enabled&&coordinator) {
+      const requireDemoReviewKey=(req:any)=>requireThat(
+        authenticatedWebhook(req.headers['x-gate-demo-review-key'],options.demoReview!.accessKey),
+        'UNAUTHENTICATED','Valid demo review authentication required.',401);
+      demo.post('/transactions/:id/orchestration',{config:{rateLimit:{max:3,timeWindow:'10 minutes'}}},async (req,reply)=>{
+        requireDemoReviewKey(req);ZodDemoReviewStart.parse(req.body??{});
+        const identity=await demoPrincipal(db,options.demoWorkspace!);
+        const result=await coordinator.startDemo(identity,idSchema.parse((req.params as any).id),keySchema.parse(req.headers['idempotency-key']));
+        reply.code(202);
+        return {data:{...result,financialApproval:false,paymentExecution:false},meta:{traceId:req.id,mode:'sandbox',provider:'simulator'}};
+      });
+      demo.get('/orchestrations/:id',{config:{rateLimit:{max:30,timeWindow:'1 minute'}}},async req=>{
+        requireDemoReviewKey(req);
+        const identity=await demoPrincipal(db,options.demoWorkspace!);
+        return {data:await coordinator.getDemo(identity,idSchema.parse((req.params as any).id)),meta:{traceId:req.id,mode:'sandbox',provider:'simulator'}};
+      });
+    }
     demo.post('/transactions/:id/investigation', async req => ({data:await investigations.localRun(await demoPrincipal(db,options.demoWorkspace!),idSchema.parse((req.params as any).id),req.body,keySchema.parse(req.headers['idempotency-key'])),meta:{traceId:req.id}}));
     demo.post('/transactions/:id/review', async req => {
       const p = await demoPrincipal(db, options.demoWorkspace!);
@@ -135,6 +177,19 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     const key = (req: any) => keySchema.parse(req.headers["idempotency-key"]);
     const id = (req: any) => idSchema.parse(req.params.id);
     const wrap = (data: unknown, traceId: string) => ({ data, meta: { traceId, mode: "sandbox", provider: "simulator" } });
+    if(coordinator) {
+      api.get('/orchestrations/status',async req=>wrap(await coordinator.availability(await principal(req)),req.id));
+      api.get('/requests/:id/orchestrations',async req=>wrap(await coordinator.list(await principal(req),id(req)),req.id));
+      api.post('/orchestrations',async(req,reply)=>{
+        const body=ZodOrchestrationStart.parse(req.body);
+        const data=await coordinator.start(await principal(req),body.requestId,key(req));reply.code(202);return wrap(data,req.id);
+      });
+      api.get('/orchestrations/:id',async req=>wrap(await coordinator.get(await principal(req),id(req)),req.id));
+      api.post('/orchestrations/:id/recover',async(req,reply)=>{
+        ZodOrchestrationRecovery.parse(req.body);
+        const data=await coordinator.recover(await principal(req),id(req),key(req));reply.code(202);return wrap(data,req.id);
+      });
+    }
     registerPaymentRoutes(api, { service, principal, development: !!options.developmentFaults });
     api.get("/me", async req => { const p = await principal(req); return wrap({ id: p.id, role: p.role, orgId: p.orgId, approvalLimitMinor: p.approvalLimitMinor, capabilities: p.capabilities, authMethod: p.authMethod }, req.id); });
     api.get("/schemas", async req => wrap({ contractVersion: "1.0.0", schemas: apiSchemas }, req.id));
@@ -161,10 +216,18 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
       requireThat(result, "NOT_FOUND", "Context not found.", 404); return wrap(result, req.id);
     });
     api.get("/dashboard", async req => wrap(await service.dashboard(await principal(req)), req.id));
+    api.post('/requests/:id/transaction/review',async req=>{
+      const p=await principal(req);roleAccess(p,['FINANCE']);
+      return wrap(await reviewTransaction(db,p,id(req),req.body,key(req),'authenticated_human'),req.id);
+    });
+    api.post('/requests/:id/reject', async req => wrap(await service.rejectPending(await principal(req), id(req), req.body, key(req)), req.id));
     api.post("/requests/:id/review", async req => wrap(await service.consent(await principal(req), id(req), req.body, key(req), false), req.id));
     api.get("/catalog", async req => wrap(await service.catalog(await principal(req)), req.id));
     api.get("/requests", async req => wrap({ items: await service.list(await principal(req)), limit: 50, exhaustive: false }, req.id));
-    api.post("/requests", async (req, reply) => { const result = await service.create(await principal(req), req.body, key(req)); reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id); });
+    api.post("/requests", async (req, reply) => {
+      const result=await service.create(await principal(req),req.body,key(req));
+      reply.code(201).header("Location", `/v1/requests/${result.id}`); return wrap(result, req.id);
+    });
     api.post("/policy/preview", async req => wrap(await service.previewProposal(await principal(req), req.body), req.id));
     api.post("/requests/:id/trust-label", async req => wrap(await labelTrustHistory(db,await principal(req),id(req),req.body,key(req)),req.id));
     api.get("/requests/:id", async req => wrap(await service.get(await principal(req), id(req)), req.id));
@@ -186,5 +249,6 @@ export function createApp(db: DB, options: { origins?: string[]; mcpHosts?: stri
     api.get("/sources/search", async req => wrap({ items: await service.search(await principal(req), String((req.query as any).q ?? "")), exhaustive: false }, req.id));
   }, { prefix: "/v1" });
   attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity);
+  attachMcp(app, db, service, options.mcpHosts ?? ["localhost:8000", "127.0.0.1:8000"], origins, options.devrevIdentity,{path:'/mcp/orchestration',readOnly:true});
   return app;
 }

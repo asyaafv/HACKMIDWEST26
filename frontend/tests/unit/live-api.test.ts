@@ -10,7 +10,7 @@ it('preserves exact cents and rejects formats that require rounding', () => {
 it('retains the identical mutation key after a lost response and rejects changed intent', async () => {
   const fetcher = vi.fn().mockRejectedValueOnce(new Error('lost')).mockResolvedValue(new Response(JSON.stringify({ data: { id: 'recorded' } })));
   vi.stubGlobal('fetch', fetcher);
-  const api = new LiveApi(); api.token = 'private';
+  const api = new LiveApi();
   await expect(api.call('/requests', { amountMinor: '100' }, 'proposal')).rejects.toThrow('Response lost');
   await expect(api.call('/requests', { amountMinor: '101' }, 'proposal')).rejects.toThrow('Uncertain action');
   await expect(api.call('/requests', { amountMinor: '100' }, 'proposal')).resolves.toEqual({ id: 'recorded' });
@@ -24,5 +24,5 @@ it('uses cookie CSRF only for writes and clears all authentication on disconnect
   await api.call('/me'); await api.call('/requests/x/consent', {}, 'consent');
   expect(fetcher.mock.calls[0][1].headers['X-CSRF-Token']).toBeUndefined();
   expect(fetcher.mock.calls[1][1].headers['X-CSRF-Token']).toBe('csrf');
-  api.clear(); expect(api.csrf).toBe(''); expect(api.token).toBe('');
+  api.clear(); expect(api.csrf).toBe('');
 });

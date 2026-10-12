@@ -17,4 +17,4 @@ export const toolSchemas={
  gate_list_requests:listInput,
  gate_get_request:z.object({request_id:idSchema,validate_decision:z.boolean().optional()}).strict(),
 };
-export const toolOutputSchema=z.object({data:z.unknown(),mode:z.literal('sandbox'),provider:z.literal('simulator'),trace_id:z.string(),server_version:z.string(),dataset_version:z.null()});
+export const toolOutputSchema=z.object({data:z.unknown(),mode:z.literal('sandbox'),provider:z.literal('simulator'),trace_id:z.string(),server_version:z.string(),dataset_version:z.null(),access_mode:z.literal('orchestration_read_only').optional()});
