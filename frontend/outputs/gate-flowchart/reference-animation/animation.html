@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gate — Request / Resolution</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#1b1d1f;color:#f4f4f5;font:15px system-ui;display:grid;min-height:100vh;place-content:center;padding:20px}main{width:min(1688px,100%);margin:auto}canvas{width:100%;height:auto;display:block}footer{display:flex;align-items:center;gap:20px;padding:16px 0}button{font:inherit;border:1px solid #6b5140;background:#372e29;color:#efa36d;padding:10px 20px;border-radius:8px;cursor:pointer}span{color:#b8b8be}a{margin-left:auto;color:#efa36d}
+</style>
+<main><canvas width="1688" height="932" aria-label="Gate request flowchart with automatic approval and human-review branches joining at Request resolved"></canvas><footer><button id="replay">Replay animation</button><span>10 seconds · original reference layout</span><a href="gate-reference-animation.mp4" download>Download MP4</a></footer></main>
+<script>
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+const reference=new Image();reference.src='reference.png';
+const ease=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),3);
+function part(x,y,w,h,alpha=1){if(alpha<=0||w<=0||h<=0)return;ctx.save();ctx.globalAlpha=Math.min(1,alpha);ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.drawImage(reference,0,0);ctx.restore()}
+function card(t,start,rect){part(...rect,ease((t-start)/.55))}
+function line(t,start,duration,rect,direction='down'){
+ const p=ease((t-start)/duration);let [x,y,w,h]=rect;
+ if(direction==='down')h*=p;
+ if(direction==='right')w*=p;
+ if(direction==='left'){x+=w*(1-p);w*=p}
+ part(x,y,w,h);
+}
+window.renderFrame=t=>{
+ ctx.globalAlpha=1;ctx.fillStyle='#1b1d1f';ctx.fillRect(0,0,1688,932);
+ ctx.globalAlpha=.13+.87*ease((t-6.8)/.5);ctx.drawImage(reference,0,0);ctx.globalAlpha=1;
+ part(0,0,1688,115);part(835,164,540,115);
+ card(t,0,[84,145,644,143]);
+ line(t,.65,.65,[390,280,34,68]);
+ card(t,1.2,[84,340,644,141]);
+ line(t,1.8,.75,[390,475,34,117]);
+ card(t,1.9,[285,508,255,36]);
+ card(t,2.5,[84,584,644,122]);
+ line(t,3.05,.65,[721,398,218,27],'right');
+ card(t,3.1,[800,362,61,34]);
+ card(t,3.65,[930,340,644,141]);
+ line(t,4.35,.65,[1236,475,34,117]);
+ card(t,4.9,[930,584,644,122]);
+ line(t,5.5,.35,[395,699,24,54]);
+ line(t,5.5,.35,[1240,699,24,54]);
+ line(t,5.8,.6,[405,737,440,24],'right');
+ line(t,5.8,.6,[841,737,413,24],'left');
+ line(t,6.35,.35,[827,747,31,53]);
+ card(t,6.65,[520,788,645,121]);
+ if(t>=7.3)ctx.drawImage(reference,0,0);
+};
+let raf,start;
+function play(){cancelAnimationFrame(raf);start=performance.now();function tick(now){const t=Math.min(10,(now-start)/1000);renderFrame(t);if(t<10)raf=requestAnimationFrame(tick)}raf=requestAnimationFrame(tick)}
+window.ready=reference.decode().then(()=>{renderFrame(0);if(!new URLSearchParams(location.search).has('render'))play()});
+document.querySelector('#replay').onclick=play;
+</script>
+</html>
